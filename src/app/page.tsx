@@ -1,3 +1,231 @@
-export default function Home() {
-  return <></>;
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCurrentUser, getFeedPosts, getLearningCourses, mockUserProfiles } from "@/lib/mock-data";
+import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
+import { Briefcase, Edit3, Image as ImageIcon, Link2, MessageCircle, Repeat, Send, Share2, ThumbsUp, Users, Video } from "lucide-react";
+import Image from 'next/image';
+import Link from "next/link";
+
+async function CreatePostCard() {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return null;
+
+  return (
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="flex items-center space-x-3 mb-3">
+          <Link href={`/profile/${currentUser.id}`}>
+            <Avatar>
+              <AvatarImage src={currentUser.profilePictureUrl} alt={currentUser.firstName} data-ai-hint="user avatar" />
+              <AvatarFallback>{currentUser.firstName.charAt(0)}{currentUser.lastName.charAt(0)}</AvatarFallback>
+            </Avatar>
+          </Link>
+          <Button variant="outline" className="flex-grow justify-start rounded-full text-muted-foreground">
+            Start a post
+          </Button>
+        </div>
+        <div className="flex justify-around">
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
+            <ImageIcon className="mr-2 h-5 w-5 text-blue-500" /> Media
+          </Button>
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
+            <Video className="mr-2 h-5 w-5 text-green-500" /> Video
+          </Button>
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
+            <Briefcase className="mr-2 h-5 w-5 text-purple-500" /> Job
+          </Button>
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
+            <Edit3 className="mr-2 h-5 w-5 text-orange-500" /> Write article
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PostActions({ post }: { post: PostType }) {
+  return (
+    <div className="flex justify-around items-center pt-2 border-t mt-2">
+      <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
+        <ThumbsUp className={`mr-1 h-5 w-5 ${post.isLikedByCurrentUser ? 'text-primary' : ''}`} /> Like
+      </Button>
+      <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
+        <MessageCircle className="mr-1 h-5 w-5" /> Comment
+      </Button>
+      <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
+        <Repeat className="mr-1 h-5 w-5" /> Repost
+      </Button>
+      <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
+        <Send className="mr-1 h-5 w-5" /> Send
+      </Button>
+    </div>
+  );
+}
+
+
+function PostCard({ post }: { post: PostType }) {
+  return (
+    <Card className="mb-4">
+      <CardHeader className="p-4">
+        <div className="flex items-center space-x-3">
+          <Link href={`/profile/${post.author.id}`}>
+            <Avatar>
+              <AvatarImage src={post.author.profilePictureUrl} alt={post.author.firstName} data-ai-hint="user avatar"/>
+              <AvatarFallback>{post.author.firstName.charAt(0)}{post.author.lastName.charAt(0)}</AvatarFallback>
+            </Avatar>
+          </Link>
+          <div>
+            <Link href={`/profile/${post.author.id}`} className="font-semibold hover:underline">{post.author.firstName} {post.author.lastName}</Link>
+            <p className="text-xs text-muted-foreground">{post.author.headline}</p>
+            <p className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleDateString()}</p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-2">
+        <p className="text-sm mb-2 whitespace-pre-line">{post.content}</p>
+        {post.imageUrl && (
+          <div className="my-2 rounded-md overflow-hidden">
+            <Image src={post.imageUrl} alt="Post image" width={600} height={400} className="w-full h-auto object-cover" data-ai-hint="social media post"/>
+          </div>
+        )}
+      </CardContent>
+      <CardFooter className="px-4 pb-2 pt-0">
+        <div className="flex justify-between w-full text-xs text-muted-foreground">
+          <span>{post.likesCount} Likes</span>
+          <span>{post.commentsCount} Comments</span>
+          <span>{post.repostsCount} Reposts</span>
+        </div>
+      </CardFooter>
+      <div className="px-4 pb-3">
+         <PostActions post={post} />
+      </div>
+    </Card>
+  );
+}
+
+async function ProfileSummaryCard() {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) return null;
+
+  return (
+    <Card>
+      <div className="relative h-20 bg-muted overflow-hidden">
+        {currentUser.coverPhotoUrl && <Image src={currentUser.coverPhotoUrl} alt="Cover photo" layout="fill" objectFit="cover" data-ai-hint="profile cover background"/>}
+      </div>
+      <CardContent className="p-4 text-center -mt-10">
+        <Link href={`/profile/${currentUser.id}`}>
+          <Avatar className="h-20 w-20 mx-auto border-4 border-card mb-2">
+            <AvatarImage src={currentUser.profilePictureUrl} alt={currentUser.firstName} data-ai-hint="user avatar" />
+            <AvatarFallback>{currentUser.firstName.charAt(0)}{currentUser.lastName.charAt(0)}</AvatarFallback>
+          </Avatar>
+        </Link>
+        <Link href={`/profile/${currentUser.id}`} className="block font-semibold text-lg hover:underline">{currentUser.firstName} {currentUser.lastName}</Link>
+        <p className="text-sm text-muted-foreground mb-3">{currentUser.headline}</p>
+        <div className="border-t pt-3 space-y-1 text-sm">
+          <Link href="/network" className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
+            <span>Connections</span>
+            <span className="text-primary font-semibold">{currentUser.connectionsCount || 0}</span>
+          </Link>
+           <Link href="/network" className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
+            <span>Invitations</span>
+            <span className="text-primary font-semibold">{/* Mock */}5</span>
+          </Link>
+        </div>
+      </CardContent>
+      <CardFooter className="p-4 border-t">
+        <Button variant="outline" className="w-full">
+          <Users className="mr-2 h-4 w-4" /> My Network
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-md">People you may know</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {people.slice(0, 3).map(person => (
+          <div key={person.id} className="flex items-center space-x-3">
+            <Avatar>
+              <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small" />
+              <AvatarFallback>{person.firstName.charAt(0)}{person.lastName.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-grow">
+              <Link href={`/profile/${person.id}`} className="font-semibold text-sm hover:underline">{person.firstName} {person.lastName}</Link>
+              <p className="text-xs text-muted-foreground">{person.headline}</p>
+            </div>
+            <Button variant="outline" size="sm">
+              <Link2 className="h-4 w-4 mr-1" /> Connect
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+      <CardFooter>
+        <Button variant="ghost" className="w-full text-primary">Show more</Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+async function LearningCoursesCard() {
+  const courses = await getLearningCourses();
+  if (!courses || courses.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-md">Recommended learning</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {courses.slice(0,2).map((course: LearningCourse) => (
+          <Link href={`/learning/${course.id}`} key={course.id} className="flex items-center space-x-3 group">
+            <Image src={course.thumbnailUrl} alt={course.title} width={80} height={45} className="rounded object-cover" data-ai-hint="course thumbnail" />
+            <div>
+              <p className="font-semibold text-sm group-hover:text-primary group-hover:underline">{course.title}</p>
+              <p className="text-xs text-muted-foreground">{course.instructor}</p>
+            </div>
+          </Link>
+        ))}
+      </CardContent>
+      <CardFooter>
+         <Button variant="ghost" className="w-full text-primary">See all recommendations</Button>
+      </CardFooter>
+    </Card>
+  )
+}
+
+
+export default async function HomePage() {
+  const posts = await getFeedPosts();
+  const otherUsers = mockUserProfiles.filter(p => p.id !== '1'); // Filter out current user for suggestions
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+      {/* Left Sidebar */}
+      <aside className="md:col-span-1 space-y-4 sticky top-20">
+        <ProfileSummaryCard />
+        {/* Add more left sidebar cards here, e.g., recent activity, groups */}
+      </aside>
+
+      {/* Main Content Feed */}
+      <section className="md:col-span-2 space-y-4">
+        <CreatePostCard />
+        {posts.map((post) => (
+          <PostCard key={post.id} post={post} />
+        ))}
+      </section>
+
+      {/* Right Sidebar */}
+      <aside className="md:col-span-1 space-y-4 sticky top-20">
+         <PeopleMayKnowCard people={otherUsers} />
+         <LearningCoursesCard />
+        {/* Add more right sidebar cards here, e.g., trending news, ads */}
+      </aside>
+    </div>
+  );
 }
