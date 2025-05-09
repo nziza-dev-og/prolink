@@ -22,6 +22,7 @@ import { useAuth } from '@/context/auth-context';
 import { createEvent } from '@/lib/event-service';
 import type { Event as EventType } from '@/types';
 import { cn } from '@/lib/utils';
+import { FormField } from '@/components/ui/form'; // Added import
 
 const eventFormSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters.').max(150),
@@ -256,3 +257,4 @@ export default function CreateEventPage() {
     </div>
   );
 }
+
