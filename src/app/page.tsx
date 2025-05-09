@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLearningCourses, mockUserProfiles } from "@/lib/mock-data"; 
-import { getPosts as fetchPostsFromService } from '@/lib/post-service';
+import { getPostsByAuthorId } from '@/lib/post-service'; // Changed from getPosts
 import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
 import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
@@ -212,14 +212,15 @@ export default function HomePage() {
   const [otherUsers, setOtherUsers] = useState<UserProfile[]>([]); 
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
 
-  const fetchAllPosts = useCallback(async () => {
+  const fetchUserPosts = useCallback(async () => {
+    if (!currentUser) return;
     try {
-      const feedPostsData = await fetchPostsFromService();
-      setPosts(feedPostsData);
+      const userPostsData = await getPostsByAuthorId(currentUser.uid);
+      setPosts(userPostsData);
     } catch (error) {
-      console.error("Error fetching posts:", error);
+      console.error("Error fetching user posts:", error);
     }
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -231,7 +232,7 @@ export default function HomePage() {
     async function loadData() {
       if (currentUser) { 
         setIsLoadingPageData(true);
-        await fetchAllPosts(); 
+        await fetchUserPosts(); 
         
         const [learningCoursesData, allUsersData] = await Promise.all([
             getLearningCourses(), 
@@ -245,10 +246,10 @@ export default function HomePage() {
     if (!loadingAuth && currentUser) {
         loadData();
     }
-  }, [currentUser, loadingAuth, fetchAllPosts]);
+  }, [currentUser, loadingAuth, fetchUserPosts]);
 
   const handlePostCreated = () => {
-    fetchAllPosts(); 
+    fetchUserPosts(); 
   };
   
   const handlePostUpdated = (updatedPost: PostType) => {
@@ -329,3 +330,4 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
     </Card>
   )
 }
+
