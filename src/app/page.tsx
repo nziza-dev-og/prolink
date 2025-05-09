@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -9,14 +10,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLearningCourses } from "@/lib/mock-data"; 
-import { getPostsByAuthorId, getPosts } from '@/lib/post-service'; 
-import type { Post as PostType, LearningCourse, UserProfile, Skill } from "@/types";
+import { getPosts } from '@/lib/post-service'; 
+import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
 import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 import CreatePostDialog from '@/components/posts/create-post-dialog';
 import PostActions from '@/components/posts/post-actions'; 
 import CommentSection from '@/components/posts/comment-section';
-import { getFriendsOfFriendsSuggestions } from '@/lib/user-service'; // Added for FoF
+import { getFriendsOfFriendsSuggestions } from '@/lib/user-service';
 import { useToast } from '@/hooks/use-toast';
 
 function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
@@ -106,7 +107,7 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
       if (part.match(urlRegex)) {
         return (
           <a 
-            key={index} 
+            key={`link-${index}-${post.id}`} 
             href={part} 
             target="_blank" 
             rel="noopener noreferrer" 
@@ -116,7 +117,7 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
           </a>
         );
       }
-      return part;
+      return <span key={`text-${index}-${post.id}`}>{part}</span>;
     });
   };
   
@@ -299,11 +300,19 @@ export default function HomePage() {
     if (!currentUser) return; 
     setIsLoadingPageData(true);
     try {
+      // Fetch posts relevant to the current user, e.g., posts from connections or based on interests.
+      // For now, it fetches all posts for simplicity, but this should be refined.
       const allPostsData = await getPosts(); 
       
+      // Example: Filter posts to show only those from the current user or their connections
+      // This requires currentUser.connections to be populated and accurate.
+      // const userAndConnectionsIds = [currentUser.uid, ...(currentUser.connections || [])];
+      // const feedPosts = allPostsData.filter(post => userAndConnectionsIds.includes(post.authorId));
+
+      // Sort by newest first (already done by getPosts in this implementation, but good to be explicit)
       allPostsData.sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
       
-      setPosts(allPostsData);
+      setPosts(allPostsData); // Replace with `feedPosts` if filtering is implemented
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
@@ -323,7 +332,7 @@ export default function HomePage() {
         setIsLoadingPageData(true); 
         await fetchFeedPosts(); 
         
-        const learningCoursesData = await fetchLearningCourses();
+        const learningCoursesData = await getLearningCourses();
         // For "Recommended Learning", filter based on user's skills or search history (mocked for now)
         const userSkills = currentUser.skills?.map(skill => skill.name.toLowerCase()) || [];
         let filteredCourses = learningCoursesData;
@@ -377,7 +386,7 @@ export default function HomePage() {
              </div>
         ) : posts.length > 0 ? (
             posts.map((post) => (
-              <PostCard key={post.id} post={post} onPostUpdated={handlePostUpdated} />
+              <PostCard key={post.id + '-homepage'} post={post} onPostUpdated={handlePostUpdated} />
             ))
         ) : (
           !isLoadingPageData && <Card><CardContent className="p-6 text-center text-muted-foreground">No posts yet. Be the first to share something!</CardContent></Card>
@@ -421,4 +430,5 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
     </Card>
   )
 }
+
 
