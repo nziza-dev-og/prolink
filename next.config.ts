@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'i.pinimg.com',
+        hostname: 'i.pinimg.com', // Added this line
         port: '',
         pathname: '/**',
       }

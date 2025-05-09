@@ -13,7 +13,7 @@ import { useAuth } from '@/context/auth-context';
 
 // Mock data for invitations for now
 const mockInvitations: UserProfile[] = mockUserProfiles.slice(1, 3).map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString(), headline: `Wants to connect with you. Common connections: ${Math.floor(Math.random()*10)}`}));
-const mockSuggestions: UserProfile[] = mockUserProfiles.slice(0, 5).filter(p => p.id !== '1').map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString()})); // Example suggestions
+const mockSuggestions: UserProfile[] = mockUserProfiles.slice(0, 5).filter(p => p.id !== '1').map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString()})); 
 
 function InvitationCard({ user }: { user: UserProfile }) {
   return (
@@ -80,6 +80,9 @@ export default function NetworkPage() {
   }
 
   const connectionsCount = currentUser.connectionsCount || 0;
+  // Filter current user out of suggestions to avoid suggesting self-connection
+  const filteredSuggestions = mockSuggestions.filter(u => u.uid !== currentUser.uid);
+
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -131,7 +134,7 @@ export default function NetworkPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {mockInvitations.map(user => (
-                <InvitationCard key={user.id} user={user} />
+                <InvitationCard key={user.id || user.uid} user={user} />
               ))}
             </CardContent>
           </Card>
@@ -143,8 +146,8 @@ export default function NetworkPage() {
              <Button variant="ghost" size="sm">See all</Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {mockSuggestions.filter(u => u.uid !== currentUser.uid).map(user => ( // Filter out current user
-              <SuggestionCard key={user.id} user={user} />
+            {filteredSuggestions.map(user => ( 
+              <SuggestionCard key={user.id || user.uid} user={user} />
             ))}
           </div>
         </div>

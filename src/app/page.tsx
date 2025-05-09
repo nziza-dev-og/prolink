@@ -7,13 +7,13 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLearningCourses, mockUserProfiles } from "@/lib/mock-data"; // getCurrentUser removed
+import { getLearningCourses, mockUserProfiles } from "@/lib/mock-data"; 
 import { getPosts as fetchPostsFromService } from '@/lib/post-service';
 import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
 import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 import CreatePostDialog from '@/components/posts/create-post-dialog';
-import PostActions from '@/components/posts/post-actions'; // Import PostActions
+import PostActions from '@/components/posts/post-actions'; 
 
 function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
   const { currentUser, loadingAuth } = useAuth();
@@ -141,7 +141,7 @@ function ProfileSummaryCard() {
       </CardContent>
       <CardFooter className="p-4 border-t">
         <Button variant="outline" className="w-full" asChild>
-          <Link href={`/profile/${currentUser.uid}`}> {/* Updated to link to current user's profile */}
+          <Link href={`/profile/${currentUser.uid}`}> 
             <Users className="mr-2 h-4 w-4" /> My Profile
           </Link>
         </Button>
@@ -154,6 +154,7 @@ function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
   const { currentUser } = useAuth();
   if (!currentUser) return null;
 
+  // Ensure `person.id` is used for key, which should be unique in mockUserProfiles
   const suggestions = people.filter(p => p.uid !== currentUser.uid).slice(0,3);
 
   if (suggestions.length === 0) return null;
@@ -165,7 +166,7 @@ function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
       </CardHeader>
       <CardContent className="space-y-3">
         {suggestions.map(person => (
-          <div key={person.id} className="flex items-center space-x-3">
+          <div key={person.id || person.uid} className="flex items-center space-x-3"> {/* Use person.id or fallback to uid for key */}
             <Avatar>
               <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
               <AvatarFallback>{person.firstName?.charAt(0)}{person.lastName?.charAt(0)}</AvatarFallback>
@@ -174,7 +175,7 @@ function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
               <Link href={`/profile/${person.uid}`} className="font-semibold text-sm hover:underline">{person.firstName} {person.lastName}</Link>
               <p className="text-xs text-muted-foreground">{person.headline}</p>
             </div>
-            <Button variant="outline" size="sm" disabled> {/* Connect functionality to be implemented */}
+            <Button variant="outline" size="sm" disabled> 
               <Link2 className="h-4 w-4 mr-1" /> Connect
             </Button>
           </div>
@@ -196,7 +197,7 @@ export default function HomePage() {
 
   const [posts, setPosts] = useState<PostType[]>([]);
   const [learningCourses, setLearningCourses] = useState<LearningCourse[]>([]);
-  const [otherUsers, setOtherUsers] = useState<UserProfile[]>([]); // For suggestions
+  const [otherUsers, setOtherUsers] = useState<UserProfile[]>([]); 
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
 
   const fetchAllPosts = useCallback(async () => {
@@ -218,12 +219,11 @@ export default function HomePage() {
     async function loadData() {
       if (currentUser) { 
         setIsLoadingPageData(true);
-        await fetchAllPosts(); // Fetch posts initially
+        await fetchAllPosts(); 
         
-        // Fetch other data in parallel
         const [learningCoursesData, allUsersData] = await Promise.all([
-            getLearningCourses(), // from mock-data
-            Promise.resolve(mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString()}))) // Using mock users for suggestions for now
+            getLearningCourses(), 
+            Promise.resolve(mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString()}))) 
         ]);
         setLearningCourses(learningCoursesData);
         setOtherUsers(allUsersData);
@@ -236,7 +236,7 @@ export default function HomePage() {
   }, [currentUser, loadingAuth, fetchAllPosts]);
 
   const handlePostCreated = () => {
-    fetchAllPosts(); // Refetch posts when a new one is created
+    fetchAllPosts(); 
   };
   
   const handlePostUpdated = (updatedPost: PostType) => {
