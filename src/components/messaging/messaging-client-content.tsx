@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react'; 
@@ -91,7 +92,7 @@ export default function MessagingClientContent() {
     async function loadInitialData() {
       if (currentUser) {
         setIsLoadingData(true);
-        userProfilesCache.current.set(currentUser.uid, currentUser);
+        userProfilesCache.current.set(currentUser.uid, currentUser as UserProfile);
         
         const connectedUserUIDs = currentUser.connections || [];
         const convosProfiles: UserProfile[] = [];
@@ -99,25 +100,25 @@ export default function MessagingClientContent() {
           const profile = await getCachedUserProfile(uid);
           if (profile) convosProfiles.push(profile);
         }
-        // Sort conversations by most recent message (requires message fetching logic not yet implemented here)
-        // For now, just use the order of connections or sort alphabetically
+        
         convosProfiles.sort((a,b) => (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName));
         setConversations(convosProfiles);
 
         let targetUserId = chatWithUserId;
         if (targetUserId) {
-            if (!connectedUserUIDs.includes(targetUserId)) {
+            if (!connectedUserUIDs.includes(targetUserId) && !convosProfiles.some(p => p.uid === targetUserId)) {
+                // If chatWith user is not a connection, clear it.
+                // This can happen if URL is manually entered or connection was removed.
                 targetUserId = null; 
-                router.replace('/messaging');
+                router.replace('/messaging', { scroll: false }); // Use replace to avoid back button going to invalid state
             } else {
-                 setShowChatAreaMobile(true); // If a chat is specified in URL, show chat area on mobile
+                 setShowChatAreaMobile(true); 
             }
         }
         
-        // If no target ID from URL, and on mobile, don't auto-select first chat.
-        // On desktop, auto-select first chat if one exists.
-        if (!targetUserId && convosProfiles.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) { // 768px is md breakpoint
+        if (!targetUserId && convosProfiles.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) { 
             targetUserId = convosProfiles[0].uid; 
+            router.replace(`/messaging?chatWith=${targetUserId}`, { scroll: false }); // Update URL for desktop auto-select
         }
 
 
@@ -142,13 +143,12 @@ export default function MessagingClientContent() {
       loadInitialData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, loadingAuth, chatWithUserId, router]); // `router` is stable, adding for exhaustive-deps
+  }, [currentUser, loadingAuth, chatWithUserId]); // router was removed as it's stable
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
   
-  // Handle initial chat partner selection for mobile based on URL
   useEffect(() => {
     if (chatWithUserId && typeof window !== 'undefined' && window.innerWidth < 768) {
       setShowChatAreaMobile(true);
@@ -180,15 +180,15 @@ export default function MessagingClientContent() {
   };
 
   const handleSelectConversation = (user: UserProfile) => {
-    router.push(`/messaging?chatWith=${user.uid}`, { scroll: false }); // Use router to update URL
-    setActiveChatPartner(user);
-    setShowChatAreaMobile(true); // Show chat area on mobile after selection
+    router.push(`/messaging?chatWith=${user.uid}`, { scroll: false }); 
+    // setActiveChatPartner will be updated by the useEffect watching chatWithUserId
+    setShowChatAreaMobile(true); 
   };
 
   const handleBackToList = () => {
     setShowChatAreaMobile(false);
-    setActiveChatPartner(null);
-    router.push('/messaging', { scroll: false }); // Clear chatWith param
+    setActiveChatPartner(null); // Explicitly clear active partner for mobile view
+    router.push('/messaging', { scroll: false }); 
   };
 
 
@@ -203,7 +203,6 @@ export default function MessagingClientContent() {
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-10rem)] border rounded-lg overflow-hidden">
-      {/* Conversation List - Hidden on mobile when chat area is shown */}
       <aside className={cn(
         "w-full md:w-1/3 border-b md:border-b-0 md:border-r bg-muted/50 flex flex-col",
         showChatAreaMobile && activeChatPartner ? "hidden md:flex" : "flex" 
@@ -221,7 +220,7 @@ export default function MessagingClientContent() {
             <Input type="search" placeholder="Search messages" className="pl-8 bg-background" disabled/>
           </div>
         </div>
-        <ScrollArea className="flex-grow h-[200px] md:h-auto"> {/* Flex-grow takes remaining space */}
+        <ScrollArea className="flex-grow h-[200px] md:h-auto"> 
           {isLoadingData && conversations.length === 0 ? ( 
              <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto"/></div>
           ) : conversations.length === 0 ? (
@@ -233,8 +232,7 @@ export default function MessagingClientContent() {
               onClick={() => handleSelectConversation(user)}
               className={cn(
                 "w-full text-left block p-3 hover:bg-accent/50 border-b",
-                user.uid === activeChatPartner?.uid && !showChatAreaMobile ? 'bg-accent/60' : '', // Highlight active if list is shown
-                user.uid === activeChatPartner?.uid && showChatAreaMobile ? 'bg-accent/60 md:bg-accent/60' : '' // Persist highlight on desktop
+                user.uid === activeChatPartner?.uid ? 'bg-accent/60' : ''
               )}
             >
               <div className="flex items-center space-x-3">
@@ -251,7 +249,6 @@ export default function MessagingClientContent() {
                 <div>
                   <h3 className="font-medium">{user.firstName} {user.lastName}</h3>
                   <p className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">
-                    {/* Placeholder for last message preview */}
                     {user.headline || "Start a conversation..."}
                   </p>
                 </div>
@@ -261,12 +258,11 @@ export default function MessagingClientContent() {
         </ScrollArea>
       </aside>
 
-      {/* Chat Area - Hidden on mobile when conversation list is shown */}
       <section className={cn(
         "flex-grow flex-col bg-background",
         showChatAreaMobile && activeChatPartner ? "flex" : "hidden md:flex"
       )}>
-        {isLoadingData && !activeChatPartner ? ( 
+        {isLoadingData && !activeChatPartner && !chatWithUserId ? ( 
              <div className="flex-grow flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary"/></div>
         ) : activeChatPartner ? (
           <>
@@ -325,19 +321,19 @@ export default function MessagingClientContent() {
                     className="flex-grow" 
                     value={newMessageContent}
                     onChange={(e) => setNewMessageContent(e.target.value)}
-                    disabled={isSendingMessage}
+                    disabled={isSendingMessage || !activeChatPartner}
                 />
                 <Button variant="ghost" size="icon" className="hidden sm:inline-flex" disabled><Smile className="h-5 w-5" /></Button>
                 <Button variant="ghost" size="icon" className="hidden sm:inline-flex" disabled><Paperclip className="h-5 w-5" /></Button>
-                <Button type="submit" size="sm" disabled={isSendingMessage || !newMessageContent.trim()}>
+                <Button type="submit" size="sm" disabled={isSendingMessage || !newMessageContent.trim() || !activeChatPartner}>
                     {isSendingMessage ? <Loader2 className="h-4 w-4 animate-spin sm:mr-2" /> : <Send className="h-4 w-4 sm:mr-2" />}
                     <span className="hidden sm:inline">Send</span>
                 </Button>
               </form>
             </footer>
           </>
-        ) : ( // This case: no active chat partner, and not loading the main content for this section (e.g. on mobile when list is shown)
-            <div className="flex-grow items-center justify-center hidden md:flex"> {/* Only show this placeholder on md+ if no chat selected */}
+        ) : ( 
+            <div className="flex-grow items-center justify-center hidden md:flex"> 
                 <p className="text-muted-foreground">
                     {conversations.length > 0 ? "Select a conversation to start messaging." : "Connect with people to start messaging."}
                 </p>
@@ -347,3 +343,4 @@ export default function MessagingClientContent() {
     </div>
   );
 }
+
