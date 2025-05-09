@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -11,7 +12,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { getLearningCourses as fetchLearningCoursesFromMock } from "@/lib/mock-data"; 
 import { getPosts } from '@/lib/post-service'; 
 import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
-import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
+import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, CalendarPlus } from "lucide-react"; 
 import { useAuth } from '@/context/auth-context';
 import CreatePostDialog from '@/components/posts/create-post-dialog';
 import PostActions from '@/components/posts/post-actions'; 
@@ -45,8 +46,10 @@ function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
             <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50 flex-1 min-w-[100px]" onClick={() => setIsCreatePostDialogOpen(true)}>
               <ImageIcon className="mr-2 h-5 w-5 text-blue-500" /> Media
             </Button>
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50 flex-1 min-w-[100px]" disabled>
-              <Video className="mr-2 h-5 w-5 text-green-500" /> Event {/* Changed from Video to Event for variety */}
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50 flex-1 min-w-[100px]" asChild>
+              <Link href="/events/create">
+                <CalendarPlus className="mr-2 h-5 w-5 text-green-500" /> Event
+              </Link>
             </Button>
             <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50 flex-1 min-w-[100px]" asChild>
               <Link href="/jobs/post">
@@ -225,13 +228,10 @@ function PeopleMayKnowCard() {
       if (currentUser) {
         setIsLoadingSuggestions(true);
         try {
-          // Try fetching friends of friends first
           let fofSuggestions = await getFriendsOfFriendsSuggestions(currentUser.uid, 3);
           
-          // If not enough FoF, or user has no connections, fetch by location
           if (fofSuggestions.length < 3 && currentUser.location) {
             const locationSuggestions = await getUserProfileByLocation(currentUser.location, currentUser.uid, 3 - fofSuggestions.length);
-            // Combine and remove duplicates (FoF might overlap with location if friends are nearby)
             const combined = [...fofSuggestions, ...locationSuggestions];
             const uniqueSuggestions = Array.from(new Map(combined.map(item => [item.uid, item])).values());
             fofSuggestions = uniqueSuggestions.slice(0,3);
@@ -310,11 +310,10 @@ export default function HomePage() {
     if (!currentUser) return; 
     setIsLoadingPageData(true);
     try {
-      // Fetch posts relevant to the current user, e.g., posts from connections or based on interests.
-      // Also include posts by the current user themselves.
       const userAndConnectionsIds = [currentUser.uid, ...(currentUser.connections || [])];
       const allPostsData = await getPosts(); 
       
+      // Filter posts to show only those from the current user or their connections
       const feedPosts = allPostsData.filter(post => 
         userAndConnectionsIds.includes(post.authorId)
       );
@@ -325,7 +324,7 @@ export default function HomePage() {
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
-      setIsLoadingPageData(false);
+      // setIsLoadingPageData(false); // This will be set after learning courses
     }
   }, [currentUser]);
 
@@ -344,15 +343,13 @@ export default function HomePage() {
         const learningCoursesData = await fetchLearningCoursesFromMock();
         const userSkills = currentUser.skills?.map(skill => skill.name.toLowerCase()) || [];
         
-        // Prioritize courses matching user skills
         let filteredCourses = learningCoursesData.filter(course => 
             course.keywords?.some(keyword => userSkills.includes(keyword.toLowerCase()))
         );
 
-        // If not enough skill-based courses, fill with other courses
         if (filteredCourses.length < 2) {
             const otherCourses = learningCoursesData.filter(course => 
-                !filteredCourses.find(fc => fc.id === course.id) // Exclude already selected courses
+                !filteredCourses.find(fc => fc.id === course.id) 
             );
             filteredCourses = [...filteredCourses, ...otherCourses.slice(0, 2 - filteredCourses.length)];
         }
@@ -401,10 +398,10 @@ export default function HomePage() {
              </div>
         ) : posts.length > 0 ? (
             posts.map((post) => (
-              <PostCard key={post.id} post={post} onPostUpdated={handlePostUpdated} />
+              <PostCard key={`${post.id}-feed`} post={post} onPostUpdated={handlePostUpdated} />
             ))
         ) : (
-          !isLoadingPageData && <Card><CardContent className="p-6 text-center text-muted-foreground">No posts for your feed yet. Connect with more people or create a post!</CardContent></Card>
+          !isLoadingPageData && <Card><CardContent className="p-6 text-center text-muted-foreground">No posts yet. Be the first to share something!</CardContent></Card>
         )}
       </section>
 
@@ -445,3 +442,4 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
     </Card>
   )
 }
+

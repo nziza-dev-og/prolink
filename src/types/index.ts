@@ -138,6 +138,7 @@ export interface Invitation {
     id: string;
     fromUserId: string;
     toUserId: string;
+    participantIds: string[];
     status: 'pending' | 'accepted' | 'ignored' | 'cancelled';
     createdAt: Timestamp | string;
     updatedAt?: Timestamp | string;
@@ -159,3 +160,21 @@ export interface Article {
   commentsCount?: number;
 }
 
+export interface Event {
+  id: string;
+  title: string;
+  description: string;
+  dateTime: Timestamp | string; 
+  location: string; 
+  isOnline: boolean;
+  meetingLink?: string; 
+  coverImageUrl?: string;
+  organizerId: string;
+  organizerInfo: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "profilePictureUrl" | "headline">;
+  category?: string; 
+  tags?: string[];
+  attendeesCount: number;
+  // attendees?: string[]; // Array of user UIDs - for large events, consider a subcollection
+  createdAt: Timestamp | string;
+  updatedAt?: Timestamp | string;
+}

@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, Briefcase, Home, MessageSquareText, Search, Users, ChevronDown, LogOut, Settings, User as UserIcon, Loader2, ShieldCheck } from 'lucide-react';
+import { Bell, Briefcase, Home, MessageSquareText, Search, Users, ChevronDown, LogOut, Settings, User as UserIcon, Loader2, ShieldCheck, CalendarDays } from 'lucide-react'; // Added CalendarDays
 import { ProLinkLogo } from '@/components/icons/prolink-logo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ const navItems = [
   { href: '/network', label: 'My Network', icon: Users },
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/messaging', label: 'Messaging', icon: MessageSquareText },
+  { href: '/events', label: 'Events', icon: CalendarDays }, // Added Events
   { href: '/notifications', label: 'Notifications', icon: Bell },
 ];
 
@@ -94,7 +95,7 @@ export default function Header() {
           )}
         </div>
 
-        <nav className="flex items-center space-x-1 sm:space-x-2 md:space-x-4">
+        <nav className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 lg:space-x-4"> {/* Adjusted spacing */}
           {loadingAuth ? (
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           ) : currentUser ? (
