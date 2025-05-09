@@ -17,6 +17,7 @@ export interface UserProfile {
   skills?: Skill[];
   recommendations?: Recommendation[];
   createdAt: Timestamp | string; // Firestore Timestamp or ISO string
+  updatedAt?: Timestamp | string; // Optional: Firestore Timestamp or ISO string for last update
 }
 
 export interface WorkExperience {

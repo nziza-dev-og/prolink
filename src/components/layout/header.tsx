@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, Briefcase, Home, MessageSquareText, Search, Users, ChevronDown, LogOut, Settings, User as UserIcon, Loader2 } from 'lucide-react';
+import { Bell, Briefcase, Home, MessageSquareText, Search, Users, ChevronDown, LogOut, Settings, User as UserIcon, Loader2, ShieldCheck } from 'lucide-react';
 import { LinkedInLogo } from '@/components/icons/linkedin-logo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { useAuth } from '@/context/auth-context';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { useEffect, useState } from 'react';
 
 
 const navItems = [
@@ -35,10 +36,24 @@ export default function Header() {
   const router = useRouter();
   const { currentUser, loadingAuth } = useAuth();
   const { toast } = useToast();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    // Check localStorage for admin status on client side
+    if (typeof window !== 'undefined') {
+      const adminStatus = localStorage.getItem('isAdmin');
+      setIsAdmin(adminStatus === 'true');
+    }
+  }, [pathname]); // Re-check if path changes, e.g., after admin login
 
   const handleSignOut = async () => {
     try {
       await signOut(auth);
+      // Clear admin status on sign out
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('isAdmin');
+      }
+      setIsAdmin(false);
       toast({ title: 'Signed Out', description: 'You have been successfully signed out.' });
       router.push('/login');
     } catch (error: any) {
@@ -113,10 +128,20 @@ export default function Header() {
                       <span>View Profile</span>
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem disabled> {/* TODO: Implement Settings Page */}
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings & Privacy</span>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings & Privacy</span>
+                    </Link>
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/dashboard">
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        <span>Admin Dashboard</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />

@@ -1,7 +1,7 @@
 'use server';
 import type { UserProfile } from '@/types';
 import { db } from './firebase';
-import { doc, setDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount'>): Promise<void> {
   const userRef = doc(db, 'users', userId);
@@ -43,4 +43,15 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   } else {
     return null;
   }
+}
+
+export async function updateUserProfile(userId: string, data: Partial<Omit<UserProfile, 'id' | 'uid' | 'email' | 'createdAt' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connectionsCount'>>): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  // Construct the update object, ensuring not to update fields that shouldn't be directly updatable here (like email, id, uid, etc.)
+  const updateData: Record<string, any> = { ...data };
+  
+  // Add a field for when the profile was last updated
+  updateData.updatedAt = serverTimestamp();
+
+  await updateDoc(userRef, updateData);
 }
