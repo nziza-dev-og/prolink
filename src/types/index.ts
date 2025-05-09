@@ -11,7 +11,8 @@ export interface UserProfile {
   coverPhotoUrl?: string;
   summary?: string;
   location?: string;
-  connectionsCount?: number;
+  connectionsCount: number; // Made non-optional, should default to 0
+  connections?: string[]; // Array of connected user UIDs
   workExperience?: WorkExperience[];
   education?: Education[];
   skills?: Skill[];
@@ -110,4 +111,5 @@ export interface LearningCourse {
   thumbnailUrl: string;
   duration: string; // e.g. "2h 30m"
   category: string;
+  keywords?: string[]; // Added for matching user skills/interests
 }

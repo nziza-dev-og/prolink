@@ -7,18 +7,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { mockUserProfiles, getMessagesWithUser as fetchMessagesWithUser } from "@/lib/mock-data"; // getCurrentUser removed
+import { mockUserProfiles, getMessagesWithUser as fetchMessagesWithUser } from "@/lib/mock-data"; 
 import type { Message, UserProfile } from "@/types";
 import { Archive, Edit, Filter, Loader2, Paperclip, Phone, Search, Send, Smile, Video } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 
-// For now, let's get active chat partner from query param or default
-// const DEFAULT_CHATTING_WITH_USER_ID = '2';
-
 
 async function ChatMessage({ message, isCurrentUserSender, allUsers }: { message: Message, isCurrentUserSender: boolean, allUsers: UserProfile[] }) {
-  // The sender for this message. If it's the current user, their profile is in `currentUserFromAuth`.
-  // If not, find from `allUsers`.
   const sender = allUsers.find(p => p.uid === message.senderId);
   if (!sender) return null;
 
@@ -62,8 +57,7 @@ export default function MessagingPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   
-  // All user profiles (mock for now, needed for avatars etc.)
-  const allMockProfiles = mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString()}));
+  const allMockProfiles = mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString(), connectionsCount: p.connectionsCount || 0}));
 
 
   useEffect(() => {
@@ -76,17 +70,27 @@ export default function MessagingPage() {
     async function loadInitialData() {
       if (currentUser) {
         setIsLoadingData(true);
-        // Simplistic conversation list (all users except current user)
-        const convos = allMockProfiles.filter(p => p.uid !== currentUser.uid);
+        
+        // Filter conversations to only include connected users
+        const connectedUserUIDs = currentUser.connections || [];
+        const convos = allMockProfiles.filter(p => p.uid !== currentUser.uid && connectedUserUIDs.includes(p.uid));
         setConversations(convos);
 
-        const targetUserId = chatWithUserId || (convos.length > 0 ? convos[0].uid : null);
+        let targetUserId = chatWithUserId;
+        // If chatWithUserId is provided, check if they are a connection. If not, or if no chatWithUserId, pick first connection.
+        if (targetUserId && !connectedUserUIDs.includes(targetUserId)) {
+            targetUserId = null; // User is trying to chat with non-connection, clear it.
+        }
+        if (!targetUserId && convos.length > 0) {
+            targetUserId = convos[0].uid; // Default to first connection
+        }
+
 
         if (targetUserId) {
           const partner = allMockProfiles.find(p => p.uid === targetUserId);
           setActiveChatPartner(partner || null);
           if (partner) {
-            const msgs = await fetchMessagesWithUser(partner.uid); // This mock fn uses 'id', adapt if needed
+            const msgs = await fetchMessagesWithUser(partner.uid); 
             setMessages(msgs);
           } else {
             setMessages([]);
@@ -102,7 +106,7 @@ export default function MessagingPage() {
     if (!loadingAuth && currentUser) {
       loadInitialData();
     }
-  }, [currentUser, loadingAuth, chatWithUserId]);
+  }, [currentUser, loadingAuth, chatWithUserId, allMockProfiles]);
 
 
   if (loadingAuth || (!currentUser && !loadingAuth)) {
@@ -135,7 +139,10 @@ export default function MessagingPage() {
         <ScrollArea className="h-[calc(100%-8rem)]"> {/* Adjust height */}
           {isLoadingData ? (
              <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto"/></div>
-          ) : conversations.map(user => (
+          ) : conversations.length === 0 ? (
+            <p className="p-4 text-center text-muted-foreground">No connections to message. Connect with people to start chatting.</p>
+          )
+          : conversations.map(user => (
             <Link href={`/messaging?chatWith=${user.uid}`} key={user.uid} className={`block p-3 hover:bg-accent/50 border-b ${user.uid === activeChatPartner?.uid ? 'bg-accent/60' : ''}`}>
               <div className="flex items-center space-x-3">
                 <Avatar>
@@ -189,16 +196,18 @@ export default function MessagingPage() {
 
             <footer className="p-4 border-t">
               <div className="flex items-center space-x-2">
-                <Input placeholder="Write a message..." className="flex-grow" />
-                <Button variant="ghost" size="icon"><Smile className="h-5 w-5" /></Button>
-                <Button variant="ghost" size="icon"><Paperclip className="h-5 w-5" /></Button>
-                <Button><Send className="h-5 w-5 mr-2" />Send</Button>
+                <Input placeholder="Write a message..." className="flex-grow" disabled/>
+                <Button variant="ghost" size="icon" disabled><Smile className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" disabled><Paperclip className="h-5 w-5" /></Button>
+                <Button disabled><Send className="h-5 w-5 mr-2" />Send</Button>
               </div>
             </footer>
           </>
         ) : (
             <div className="flex-grow flex items-center justify-center">
-                <p className="text-muted-foreground">Select a conversation to start messaging.</p>
+                <p className="text-muted-foreground">
+                    {conversations.length > 0 ? "Select a connection to start messaging." : "Connect with people to start messaging."}
+                </p>
             </div>
         )}
       </section>

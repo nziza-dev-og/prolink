@@ -7,9 +7,9 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLearningCourses, mockUserProfiles } from "@/lib/mock-data"; 
-import { getPostsByAuthorId } from '@/lib/post-service'; // Changed from getPosts
-import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
+import { getLearningCourses as fetchLearningCourses, mockUserProfiles } from "@/lib/mock-data"; 
+import { getPosts } from '@/lib/post-service'; 
+import type { Post as PostType, LearningCourse, UserProfile, Skill } from "@/types";
 import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 import CreatePostDialog from '@/components/posts/create-post-dialog';
@@ -69,8 +69,8 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
     }
   };
   
-  if (!post.author) {
-    console.warn(`PostCard: post.author is undefined for post ID: ${post.id}. Post data:`, JSON.stringify(post));
+  if (!post.author || !post.author.uid) { // Check author and author.uid
+    console.warn(`PostCard: post.author or post.author.uid is undefined for post ID: ${post.id}. Post data:`, JSON.stringify(post));
     return (
       <Card className="mb-4">
         <CardContent className="p-4">
@@ -84,14 +84,14 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
     <Card className="mb-4">
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
-          <Link href={post.author.uid ? `/profile/${post.author.uid}` : '#'}>
+          <Link href={`/profile/${post.author.uid}`}>
             <Avatar>
               <AvatarImage src={post.author.profilePictureUrl} alt={post.author.firstName || 'User'} data-ai-hint="user avatar"/>
               <AvatarFallback>{post.author.firstName?.charAt(0)}{post.author.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
           </Link>
           <div>
-            <Link href={post.author.uid ? `/profile/${post.author.uid}` : '#'} className="font-semibold hover:underline">
+            <Link href={`/profile/${post.author.uid}`} className="font-semibold hover:underline">
               {post.author.firstName || 'Unknown'} {post.author.lastName || 'Author'}
             </Link>
             <p className="text-xs text-muted-foreground">{post.author.headline || 'No headline'}</p>
@@ -127,6 +127,8 @@ function ProfileSummaryCard() {
   if (loadingAuth) return <Card className="p-4 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary"/></Card>;
   if (!currentUser) return null;
 
+  const connectionsDisplayCount = currentUser.connections?.length ?? currentUser.connectionsCount ?? 0;
+
   return (
     <Card>
       <div className="relative h-20 bg-muted overflow-hidden">
@@ -142,11 +144,11 @@ function ProfileSummaryCard() {
         <Link href={`/profile/${currentUser.uid}`} className="block font-semibold text-lg hover:underline">{currentUser.firstName} {currentUser.lastName}</Link>
         <p className="text-sm text-muted-foreground mb-3">{currentUser.headline}</p>
         <div className="border-t pt-3 space-y-1 text-sm">
-          <Link href="/network" className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
+          <Link href={`/network?tab=connections`} className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
             <span>Connections</span>
-            <span className="text-primary font-semibold">{currentUser.connectionsCount || 0}</span>
+            <span className="text-primary font-semibold">{connectionsDisplayCount}</span>
           </Link>
-           <Link href="/network" className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
+           <Link href={`/network?tab=invitations`} className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
             <span>Invitations</span>
             <span className="text-primary font-semibold">{/* Mock */}5</span>
           </Link>
@@ -163,18 +165,31 @@ function ProfileSummaryCard() {
   );
 }
 
-function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
+function PeopleMayKnowCard() {
   const { currentUser } = useAuth();
-  if (!currentUser) return null;
+  const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
 
-  const suggestions = people.filter(p => p.uid !== currentUser.uid).slice(0,3);
+  useEffect(() => {
+    if (currentUser) {
+      const currentUserLocation = currentUser.location;
+      const currentUserConnections = currentUser.connections || [];
+      
+      const filteredSuggestions = mockUserProfiles.filter(p => 
+        p.uid !== currentUser.uid && // Not the current user
+        !currentUserConnections.includes(p.uid) && // Not already connected
+        (currentUserLocation ? p.location === currentUserLocation : true) // Same location if current user has one, otherwise all locations
+      ).slice(0,3);
+      setSuggestions(filteredSuggestions);
+    }
+  }, [currentUser]);
 
-  if (suggestions.length === 0) return null;
+
+  if (!currentUser || suggestions.length === 0) return null;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-md">People you may know</CardTitle>
+        <CardTitle className="text-md">People you may know {currentUser.location ? `in ${currentUser.location}` : ''}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {suggestions.map(person => (
@@ -208,17 +223,21 @@ export default function HomePage() {
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostType[]>([]);
-  const [learningCourses, setLearningCourses] = useState<LearningCourse[]>([]);
-  const [otherUsers, setOtherUsers] = useState<UserProfile[]>([]); 
+  const [allLearningCourses, setAllLearningCourses] = useState<LearningCourse[]>([]);
+  const [recommendedCourses, setRecommendedCourses] = useState<LearningCourse[]>([]);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
 
-  const fetchUserPosts = useCallback(async () => {
-    if (!currentUser) return;
+  const fetchAllPosts = useCallback(async () => {
+    if (!currentUser) return; // Ensure currentUser is available
+    setIsLoadingPageData(true);
     try {
-      const userPostsData = await getPostsByAuthorId(currentUser.uid);
-      setPosts(userPostsData);
+      // Fetch all posts, not just user's posts for the main feed
+      const allPostsData = await getPosts(); 
+      setPosts(allPostsData);
     } catch (error) {
-      console.error("Error fetching user posts:", error);
+      console.error("Error fetching posts:", error);
+    } finally {
+      setIsLoadingPageData(false);
     }
   }, [currentUser]);
 
@@ -229,27 +248,35 @@ export default function HomePage() {
   }, [currentUser, loadingAuth, router]);
 
   useEffect(() => {
-    async function loadData() {
+    async function loadInitialData() {
       if (currentUser) { 
-        setIsLoadingPageData(true);
-        await fetchUserPosts(); 
+        setIsLoadingPageData(true); // Start loading
+        await fetchAllPosts(); 
         
-        const [learningCoursesData, allUsersData] = await Promise.all([
-            getLearningCourses(), 
-            Promise.resolve(mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString()}))) 
-        ]);
-        setLearningCourses(learningCoursesData);
-        setOtherUsers(allUsersData);
-        setIsLoadingPageData(false);
+        const learningCoursesData = await fetchLearningCourses();
+        setAllLearningCourses(learningCoursesData);
+        
+        // Simulate learning recommendations
+        const userSkills = currentUser.skills?.map(skill => skill.name.toLowerCase()) || [];
+        if (userSkills.length > 0 && learningCoursesData.length > 0) {
+            const matchingCourses = learningCoursesData.filter(course => 
+                course.keywords?.some(keyword => userSkills.includes(keyword.toLowerCase()))
+            );
+            setRecommendedCourses(matchingCourses.length > 0 ? matchingCourses.slice(0,2) : learningCoursesData.slice(0,2));
+        } else {
+            setRecommendedCourses(learningCoursesData.slice(0,2));
+        }
+        // No longer setting otherUsers here, PeopleMayKnowCard handles its own data fetching/filtering
+        setIsLoadingPageData(false); // Finish loading
       }
     }
     if (!loadingAuth && currentUser) {
-        loadData();
+        loadInitialData();
     }
-  }, [currentUser, loadingAuth, fetchUserPosts]);
+  }, [currentUser, loadingAuth, fetchAllPosts]);
 
   const handlePostCreated = () => {
-    fetchUserPosts(); 
+    fetchAllPosts(); 
   };
   
   const handlePostUpdated = (updatedPost: PostType) => {
@@ -290,15 +317,11 @@ export default function HomePage() {
       </section>
 
       <aside className="md:col-span-1 space-y-4 sticky top-20">
-         {isLoadingPageData ? (
+         <PeopleMayKnowCard />
+         {isLoadingPageData && recommendedCourses.length === 0 ? (
             <Card><CardContent className="p-4 h-48 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></CardContent></Card>
          ) : (
-            <PeopleMayKnowCard people={otherUsers} />
-         )}
-         {isLoadingPageData ? (
-            <Card><CardContent className="p-4 h-48 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></CardContent></Card>
-         ) : (
-            learningCourses.length > 0 && <LearningCoursesCard courses={learningCourses} />
+            recommendedCourses.length > 0 && <LearningCoursesCard courses={recommendedCourses} />
          )}
       </aside>
     </div>
@@ -314,7 +337,7 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
         <CardTitle className="text-md">Recommended learning</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {courses.slice(0,2).map((course: LearningCourse) => (
+        {courses.map((course: LearningCourse) => ( // Show all passed courses, parent component limits to 2
           <Link href={`/learning/${course.id}`} key={course.id} className="flex items-center space-x-3 group">
             <Image src={course.thumbnailUrl} alt={course.title} width={80} height={45} className="rounded object-cover" data-ai-hint="course thumbnail"/>
             <div>
@@ -330,4 +353,3 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
     </Card>
   )
 }
-

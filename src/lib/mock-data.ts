@@ -16,7 +16,8 @@ export const mockUserProfiles: UserProfile[] = [
     coverPhotoUrl: 'https://picsum.photos/seed/alicecover/800/200',
     summary: 'Passionate software engineer with 8+ years of experience in developing scalable web applications. Expertise in React, Node.js, and cloud technologies.',
     location: 'San Francisco, CA',
-    connectionsCount: 500,
+    connectionsCount: 1,
+    connections: ['mockuser2'],
     workExperience: [
       { id: 'we1', title: 'Senior Software Engineer', companyName: 'TechCorp', startDate: 'Jan 2020', endDate: 'Present', description: 'Led development of key features for the flagship product.' , companyLogoUrl: 'https://picsum.photos/seed/techcorp/50/50' },
       { id: 'we2', title: 'Software Engineer', companyName: 'Innovate Solutions', startDate: 'Jun 2017', endDate: 'Dec 2019', description: 'Contributed to various client projects using modern web technologies.', companyLogoUrl: 'https://picsum.photos/seed/innovate/50/50' },
@@ -32,7 +33,7 @@ export const mockUserProfiles: UserProfile[] = [
       { id: 's4', name: 'TypeScript', endorsements: 70 },
       { id: 's5', name: 'AWS', endorsements: 60 },
     ],
-    createdAt: new Date().toISOString(), 
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(), // 30 days ago
   },
   {
     id: '2',
@@ -45,7 +46,8 @@ export const mockUserProfiles: UserProfile[] = [
     coverPhotoUrl: 'https://picsum.photos/seed/bobcover/800/200',
     summary: 'Driving product strategy and execution for innovative SaaS solutions. Strong believer in user-centric design.',
     location: 'New York, NY',
-    connectionsCount: 342,
+    connectionsCount: 1,
+    connections: ['mockuser1'],
      workExperience: [
       { id: 'we3', title: 'Product Manager', companyName: 'NextGen Products', startDate: 'Mar 2019', endDate: 'Present', description: 'Defining product roadmap and working with cross-functional teams.', companyLogoUrl: 'https://picsum.photos/seed/nextgen/50/50' },
     ],
@@ -56,7 +58,7 @@ export const mockUserProfiles: UserProfile[] = [
       { id: 's6', name: 'Product Management', endorsements: 90 },
       { id: 's7', name: 'Agile Methodologies', endorsements: 75 },
     ],
-    createdAt: new Date().toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString(), // 60 days ago
   },
   {
     id: '3',
@@ -69,16 +71,53 @@ export const mockUserProfiles: UserProfile[] = [
     coverPhotoUrl: 'https://picsum.photos/seed/carolcover/800/200',
     summary: 'Creating intuitive and engaging user experiences. Proficient in Figma, Sketch, and Adobe XD.',
     location: 'Austin, TX',
-    connectionsCount: 410,
-    createdAt: new Date().toISOString(),
+    connectionsCount: 0,
+    connections: [],
+    skills: [ {id: 's8', name: 'Figma', endorsements: 50}, {id: 's9', name: 'User Experience', endorsements: 65}],
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(), // 10 days ago
   },
+  {
+    id: '4',
+    uid: 'mockuser4',
+    firstName: 'David',
+    lastName: 'Wilson',
+    email: 'david@example.com',
+    headline: 'Data Scientist at Alpha Corp',
+    profilePictureUrl: 'https://picsum.photos/seed/david/200/200',
+    coverPhotoUrl: 'https://picsum.photos/seed/davidcover/800/200',
+    summary: 'Expert in machine learning and data analysis.',
+    location: 'San Francisco, CA',
+    connectionsCount: 0,
+    connections: [],
+    skills: [{id: 's10', name: 'Python', endorsements: 80}, {id: 's11', name: 'Machine Learning', endorsements: 70}],
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(), // 5 days ago
+  },
+  {
+    id: '5',
+    uid: 'mockuser5',
+    firstName: 'Eve',
+    lastName: 'Brown',
+    email: 'eve@example.com',
+    headline: 'Marketing Specialist at Beta Inc',
+    profilePictureUrl: 'https://picsum.photos/seed/eve/200/200',
+    coverPhotoUrl: 'https://picsum.photos/seed/evecover/800/200',
+    summary: 'Digital marketing and campaign management.',
+    location: 'Chicago, IL',
+    connectionsCount: 0,
+    connections: [],
+    skills: [{id: 's12', name: 'SEO', endorsements: 60}, {id: 's13', name: 'Content Marketing', endorsements: 55}],
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 90).toISOString(), // 90 days ago
+  }
 ];
 
 
 export const mockLearningCourses: LearningCourse[] = [
-    { id: 'lc1', title: 'Advanced React Patterns', instructor: 'Jane Developer', thumbnailUrl: 'https://picsum.photos/seed/course1/300/170', duration: '5h 12m', category: 'Technology' },
-    { id: 'lc2', title: 'Leadership Essentials', instructor: 'John Manager', thumbnailUrl: 'https://picsum.photos/seed/course2/300/170', duration: '3h 45m', category: 'Business' },
-    { id: 'lc3', title: 'Data Visualization with D3.js', instructor: 'Sam Analyst', thumbnailUrl: 'https://picsum.photos/seed/course3/300/170', duration: '7h 30m', category: 'Technology' },
+    { id: 'lc1', title: 'Advanced React Patterns', instructor: 'Jane Developer', thumbnailUrl: 'https://picsum.photos/seed/course1/300/170', duration: '5h 12m', category: 'Technology', keywords: ['React', 'JavaScript', 'Frontend'] },
+    { id: 'lc2', title: 'Leadership Essentials', instructor: 'John Manager', thumbnailUrl: 'https://picsum.photos/seed/course2/300/170', duration: '3h 45m', category: 'Business', keywords: ['Leadership', 'Management', 'Product Management'] },
+    { id: 'lc3', title: 'Data Visualization with D3.js', instructor: 'Sam Analyst', thumbnailUrl: 'https://picsum.photos/seed/course3/300/170', duration: '7h 30m', category: 'Technology', keywords: ['Data Visualization', 'D3.js', 'JavaScript', 'Data Science'] },
+    { id: 'lc4', title: 'Python for Data Science', instructor: 'Alex Data', thumbnailUrl: 'https://picsum.photos/seed/course4/300/170', duration: '10h 00m', category: 'Technology', keywords: ['Python', 'Data Science', 'Machine Learning'] },
+    { id: 'lc5', title: 'Effective UX Design Principles', instructor: 'Sarah Designer', thumbnailUrl: 'https://picsum.photos/seed/course5/300/170', duration: '6h 15m', category: 'Design', keywords: ['UX Design', 'User Experience', 'Figma'] },
+
 ];
 
 export const mockMessages: Message[] = [
@@ -96,7 +135,9 @@ export const getProfileById = async (userId: string): Promise<UserProfile | unde
 export const getCurrentUser = async (): Promise<UserProfile | undefined> => {
   console.warn("Using MOCK getCurrentUser. AuthContext should be preferred.");
   await new Promise(resolve => setTimeout(resolve, 300));
-  return mockUserProfiles[0]; 
+  // Simulate current user with connections
+  const currentUser = mockUserProfiles.find(p => p.uid === 'mockuser1');
+  return currentUser;
 }
 
 export const getLearningCourses = async (): Promise<LearningCourse[]> => {
