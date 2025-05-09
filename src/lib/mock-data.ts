@@ -1,13 +1,13 @@
 import type { UserProfile, Post, Job, LearningCourse, Message, WorkExperience, Education, Skill } from '@/types';
-import { Timestamp } from 'firebase/firestore'; // Import Timestamp
+import { Timestamp } from 'firebase/firestore'; 
 
 // Helper to convert date strings to Timestamps for mock data where needed, or use ISO strings.
 // For simplicity, we'll use ISO strings for createdAt in mock UserProfile as well.
 
 export const mockUserProfiles: UserProfile[] = [
   {
-    id: '1',
-    uid: '1', // Firebase UID
+    id: '1', // Kept for potential legacy use in mocks, UID is primary identifier
+    uid: 'mockuser1', 
     firstName: 'Alice',
     lastName: 'Johnson',
     email: 'alice@example.com',
@@ -32,11 +32,11 @@ export const mockUserProfiles: UserProfile[] = [
       { id: 's4', name: 'TypeScript', endorsements: 70 },
       { id: 's5', name: 'AWS', endorsements: 60 },
     ],
-    createdAt: new Date().toISOString(), // Example createdAt
+    createdAt: new Date().toISOString(), 
   },
   {
     id: '2',
-    uid: '2',
+    uid: 'mockuser2',
     firstName: 'Bob',
     lastName: 'Smith',
     email: 'bob@example.com',
@@ -60,7 +60,7 @@ export const mockUserProfiles: UserProfile[] = [
   },
   {
     id: '3',
-    uid: '3',
+    uid: 'mockuser3',
     firstName: 'Carol',
     lastName: 'Davis',
     email: 'carol@example.com',
@@ -74,68 +74,6 @@ export const mockUserProfiles: UserProfile[] = [
   },
 ];
 
-export const mockPosts: Post[] = [
-  {
-    id: 'p1',
-    author: mockUserProfiles[0], // author should be Pick<UserProfile, ...>
-    content: 'Excited to share that I just launched a new open-source project! Check it out on GitHub. #opensource #javascript #react',
-    imageUrl: 'https://picsum.photos/seed/post1/600/400',
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-    likesCount: 152,
-    commentsCount: 12,
-    repostsCount: 5,
-    isLikedByCurrentUser: true,
-    comments: [
-        { id: 'c1', author: mockUserProfiles[1], content: 'This looks great, Alice!', createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), likesCount: 5, isLikedByCurrentUser: false},
-        { id: 'c2', author: mockUserProfiles[2], content: 'Awesome work!', createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(), likesCount: 3, isLikedByCurrentUser: true},
-    ]
-  },
-  {
-    id: 'p2',
-    author: mockUserProfiles[1],
-    content: 'Just attended an insightful webinar on the future of AI in product management. So many interesting takeaways! #AI #productmanagement #tech',
-    createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
-    likesCount: 88,
-    commentsCount: 7,
-    repostsCount: 2,
-    isLikedByCurrentUser: false,
-  },
-  {
-    id: 'p3',
-    author: mockUserProfiles[2],
-    content: 'Thrilled to be speaking at the upcoming UX Design Conference! My talk will be on "Designing for Accessibility". Hope to see you there! #UX #Design #Accessibility',
-    imageUrl: 'https://picsum.photos/seed/post3/600/300',
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-    likesCount: 230,
-    commentsCount: 25,
-    repostsCount: 15,
-  },
-];
-
-export const mockJobs: Job[] = [
-  {
-    id: 'j1',
-    title: 'Frontend Developer',
-    companyName: 'WebSolutions Inc.',
-    location: 'Remote',
-    employmentType: 'Full-time',
-    description: 'Seeking a skilled Frontend Developer to build responsive and user-friendly web interfaces. Experience with React and Tailwind CSS is a plus.',
-    postedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    companyLogoUrl: 'https://picsum.photos/seed/websol/50/50',
-    skillsRequired: ['React', 'JavaScript', 'HTML', 'CSS', 'Tailwind CSS'],
-  },
-  {
-    id: 'j2',
-    title: 'Data Scientist',
-    companyName: 'Alpha Analytics',
-    location: 'Boston, MA',
-    employmentType: 'Full-time',
-    description: 'Join our team to analyze large datasets, build predictive models, and derive actionable insights. Python and SQL proficiency required.',
-    postedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    companyLogoUrl: 'https://picsum.photos/seed/alpha/50/50',
-    skillsRequired: ['Python', 'SQL', 'Machine Learning', 'Statistics'],
-  },
-];
 
 export const mockLearningCourses: LearningCourse[] = [
     { id: 'lc1', title: 'Advanced React Patterns', instructor: 'Jane Developer', thumbnailUrl: 'https://picsum.photos/seed/course1/300/170', duration: '5h 12m', category: 'Technology' },
@@ -144,36 +82,21 @@ export const mockLearningCourses: LearningCourse[] = [
 ];
 
 export const mockMessages: Message[] = [
-    // Assuming senderId and receiverId are UIDs. '1' and '2' are used here for consistency with mockUserProfiles UIDs.
-    { id: 'm1', senderId: '2', receiverId: '1', content: 'Hey Alice, great work on that project!', timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(), isRead: false },
-    { id: 'm2', senderId: '1', receiverId: '2', content: 'Thanks Bob! Appreciate it.', timestamp: new Date(Date.now() - 8 * 60 * 1000).toISOString(), isRead: true },
+    { id: 'm1', senderId: 'mockuser2', receiverId: 'mockuser1', content: 'Hey Alice, great work on that project!', timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(), isRead: false },
+    { id: 'm2', senderId: 'mockuser1', receiverId: 'mockuser2', content: 'Thanks Bob! Appreciate it.', timestamp: new Date(Date.now() - 8 * 60 * 1000).toISOString(), isRead: true },
 ];
 
-// Note: getProfileById and getCurrentUser will be effectively replaced by Firestore calls and AuthContext.
-// These mock functions can remain for other parts of the app that haven't migrated yet.
 
 export const getProfileById = async (userId: string): Promise<UserProfile | undefined> => {
   console.warn("Using MOCK getProfileById. Should be replaced by Firestore call via getUserProfile.");
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-  return mockUserProfiles.find(profile => profile.id === userId);
+  await new Promise(resolve => setTimeout(resolve, 500)); 
+  return mockUserProfiles.find(profile => profile.uid === userId || profile.id === userId); // Check uid first
 };
 
-// This function is largely superseded by useAuth() hook.
-// It's kept here for any legacy usage or for parts not yet refactored.
 export const getCurrentUser = async (): Promise<UserProfile | undefined> => {
   console.warn("Using MOCK getCurrentUser. AuthContext should be preferred.");
   await new Promise(resolve => setTimeout(resolve, 300));
-  return mockUserProfiles[0]; // Assuming Alice is the current user from mock data
-}
-
-export const getFeedPosts = async (): Promise<Post[]> => {
-  await new Promise(resolve => setTimeout(resolve, 700));
-  return mockPosts;
-};
-
-export const getJobs = async (): Promise<Job[]> => {
-  await new Promise(resolve => setTimeout(resolve, 600));
-  return mockJobs;
+  return mockUserProfiles[0]; 
 }
 
 export const getLearningCourses = async (): Promise<LearningCourse[]> => {
@@ -183,7 +106,6 @@ export const getLearningCourses = async (): Promise<LearningCourse[]> => {
 
 export const getMessagesWithUser = async (userId: string): Promise<Message[]> => {
   await new Promise(resolve => setTimeout(resolve, 300));
-  // Ensure current user is '1' for this mock logic to work, or adapt based on actual current user.
-  const currentMockUserId = '1'; 
+  const currentMockUserId = 'mockuser1'; 
   return mockMessages.filter(m => (m.senderId === userId && m.receiverId === currentMockUserId) || (m.senderId === currentMockUserId && m.receiverId === userId));
 }

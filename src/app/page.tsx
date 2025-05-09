@@ -1,91 +1,88 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { getFeedPosts, getLearningCourses, mockUserProfiles } from "@/lib/mock-data"; // getCurrentUser removed
+import { getLearningCourses, mockUserProfiles } from "@/lib/mock-data"; // getCurrentUser removed
+import { getPosts as fetchPostsFromService } from '@/lib/post-service';
 import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
 import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
+import CreatePostDialog from '@/components/posts/create-post-dialog';
+import PostActions from '@/components/posts/post-actions'; // Import PostActions
 
-// CreatePostCard now uses useAuth
-function CreatePostCard() {
+function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
   const { currentUser, loadingAuth } = useAuth();
+  const [isCreatePostDialogOpen, setIsCreatePostDialogOpen] = useState(false);
 
   if (loadingAuth) return <Card className="mb-4 p-4 flex justify-center items-center h-32"><Loader2 className="h-8 w-8 animate-spin text-primary"/></Card>;
-  if (!currentUser) return null; // Or some prompt to log in/register
+  if (!currentUser) return null; 
 
   return (
-    <Card className="mb-4">
-      <CardContent className="p-4">
-        <div className="flex items-center space-x-3 mb-3">
-          <Link href={`/profile/${currentUser.uid}`}>
-            <Avatar>
-              <AvatarImage src={currentUser.profilePictureUrl} alt={currentUser.firstName || ''} data-ai-hint="user avatar" />
-              <AvatarFallback>{currentUser.firstName?.charAt(0)}{currentUser.lastName?.charAt(0)}</AvatarFallback>
-            </Avatar>
-          </Link>
-          <Button variant="outline" className="flex-grow justify-start rounded-full text-muted-foreground">
-            Start a post
-          </Button>
-        </div>
-        <div className="flex justify-around">
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
-            <ImageIcon className="mr-2 h-5 w-5 text-blue-500" /> Media
-          </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
-            <Video className="mr-2 h-5 w-5 text-green-500" /> Video
-          </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
-            <Briefcase className="mr-2 h-5 w-5 text-purple-500" /> Job
-          </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
-            <Edit3 className="mr-2 h-5 w-5 text-orange-500" /> Write article
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <>
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <div className="flex items-center space-x-3 mb-3">
+            <Link href={`/profile/${currentUser.uid}`}>
+              <Avatar>
+                <AvatarImage src={currentUser.profilePictureUrl} alt={currentUser.firstName || ''} data-ai-hint="user avatar" />
+                <AvatarFallback>{currentUser.firstName?.charAt(0)}{currentUser.lastName?.charAt(0)}</AvatarFallback>
+              </Avatar>
+            </Link>
+            <Button variant="outline" className="flex-grow justify-start rounded-full text-muted-foreground" onClick={() => setIsCreatePostDialogOpen(true)}>
+              Start a post
+            </Button>
+          </div>
+          <div className="flex justify-around">
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
+              <ImageIcon className="mr-2 h-5 w-5 text-blue-500" /> Media
+            </Button>
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
+              <Video className="mr-2 h-5 w-5 text-green-500" /> Video
+            </Button>
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
+              <Briefcase className="mr-2 h-5 w-5 text-purple-500" /> Job
+            </Button>
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
+              <Edit3 className="mr-2 h-5 w-5 text-orange-500" /> Write article
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      <CreatePostDialog 
+        open={isCreatePostDialogOpen} 
+        onOpenChange={setIsCreatePostDialogOpen}
+        onPostCreated={onPostCreated} 
+      />
+    </>
   );
 }
 
-function PostActions({ post }: { post: PostType }) {
-  return (
-    <div className="flex justify-around items-center pt-2 border-t mt-2">
-      <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
-        <ThumbsUp className={`mr-1 h-5 w-5 ${post.isLikedByCurrentUser ? 'text-primary' : ''}`} /> Like
-      </Button>
-      <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
-        <MessageCircle className="mr-1 h-5 w-5" /> Comment
-      </Button>
-      <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
-        <Repeat className="mr-1 h-5 w-5" /> Repost
-      </Button>
-      <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50">
-        <Send className="mr-1 h-5 w-5" /> Send
-      </Button>
-    </div>
-  );
-}
-
-function PostCard({ post }: { post: PostType }) {
+function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (updatedPost: PostType) => void }) {
+  const handleLikeUnlike = (postId: string, newLikes: string[], newLikesCount: number) => {
+    if (post.id === postId) {
+      onPostUpdated({ ...post, likes: newLikes, likesCount: newLikesCount });
+    }
+  };
+  
   return (
     <Card className="mb-4">
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
-          <Link href={`/profile/${post.author.id}`}>
+          <Link href={`/profile/${post.author.uid}`}>
             <Avatar>
               <AvatarImage src={post.author.profilePictureUrl} alt={post.author.firstName} data-ai-hint="user avatar"/>
               <AvatarFallback>{post.author.firstName?.charAt(0)}{post.author.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
           </Link>
           <div>
-            <Link href={`/profile/${post.author.id}`} className="font-semibold hover:underline">{post.author.firstName} {post.author.lastName}</Link>
+            <Link href={`/profile/${post.author.uid}`} className="font-semibold hover:underline">{post.author.firstName} {post.author.lastName}</Link>
             <p className="text-xs text-muted-foreground">{post.author.headline}</p>
-            <p className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleDateString()}</p>
+            <p className="text-xs text-muted-foreground">{new Date(post.createdAt as string).toLocaleDateString()}</p>
           </div>
         </div>
       </CardHeader>
@@ -105,13 +102,12 @@ function PostCard({ post }: { post: PostType }) {
         </div>
       </CardFooter>
       <div className="px-4 pb-3">
-         <PostActions post={post} />
+         <PostActions post={post} onLikeUnlike={handleLikeUnlike} />
       </div>
     </Card>
   );
 }
 
-// ProfileSummaryCard now uses useAuth
 function ProfileSummaryCard() {
   const { currentUser, loadingAuth } = useAuth();
 
@@ -145,8 +141,8 @@ function ProfileSummaryCard() {
       </CardContent>
       <CardFooter className="p-4 border-t">
         <Button variant="outline" className="w-full" asChild>
-          <Link href="/network">
-            <Users className="mr-2 h-4 w-4" /> My Network
+          <Link href={`/profile/${currentUser.uid}`}> {/* Updated to link to current user's profile */}
+            <Users className="mr-2 h-4 w-4" /> My Profile
           </Link>
         </Button>
       </CardFooter>
@@ -155,44 +151,42 @@ function ProfileSummaryCard() {
 }
 
 function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
+  const { currentUser } = useAuth();
+  if (!currentUser) return null;
+
+  const suggestions = people.filter(p => p.uid !== currentUser.uid).slice(0,3);
+
+  if (suggestions.length === 0) return null;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-md">People you may know</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {people.slice(0, 3).map(person => (
+        {suggestions.map(person => (
           <div key={person.id} className="flex items-center space-x-3">
             <Avatar>
               <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
               <AvatarFallback>{person.firstName?.charAt(0)}{person.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-grow">
-              <Link href={`/profile/${person.id}`} className="font-semibold text-sm hover:underline">{person.firstName} {person.lastName}</Link>
+              <Link href={`/profile/${person.uid}`} className="font-semibold text-sm hover:underline">{person.firstName} {person.lastName}</Link>
               <p className="text-xs text-muted-foreground">{person.headline}</p>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" disabled> {/* Connect functionality to be implemented */}
               <Link2 className="h-4 w-4 mr-1" /> Connect
             </Button>
           </div>
         ))}
       </CardContent>
       <CardFooter>
-        <Button variant="ghost" className="w-full text-primary">Show more</Button>
+        <Button variant="ghost" className="w-full text-primary" asChild>
+          <Link href="/network">Show more</Link>
+        </Button>
       </CardFooter>
     </Card>
   );
-}
-
-async function getLearningData() {
-  return getLearningCourses();
-}
-async function getFeedData() {
-  return getFeedPosts();
-}
-function getOtherUsersData() {
-   // Filter out current user for suggestions - this might need adjustment if currentUser is not '1'
-  return mockUserProfiles.filter(p => p.id !== '1');
 }
 
 
@@ -202,8 +196,17 @@ export default function HomePage() {
 
   const [posts, setPosts] = useState<PostType[]>([]);
   const [learningCourses, setLearningCourses] = useState<LearningCourse[]>([]);
-  const [otherUsers, setOtherUsers] = useState<UserProfile[]>([]);
+  const [otherUsers, setOtherUsers] = useState<UserProfile[]>([]); // For suggestions
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
+
+  const fetchAllPosts = useCallback(async () => {
+    try {
+      const feedPostsData = await fetchPostsFromService();
+      setPosts(feedPostsData);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    }
+  }, []);
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -213,26 +216,35 @@ export default function HomePage() {
 
   useEffect(() => {
     async function loadData() {
-      if (currentUser) { // Only load if user is authenticated
+      if (currentUser) { 
         setIsLoadingPageData(true);
-        const [feedPostsData, learningCoursesData, otherUsersData] = await Promise.all([
-            getFeedData(),
-            getLearningData(),
-            getOtherUsersData()
+        await fetchAllPosts(); // Fetch posts initially
+        
+        // Fetch other data in parallel
+        const [learningCoursesData, allUsersData] = await Promise.all([
+            getLearningCourses(), // from mock-data
+            Promise.resolve(mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString()}))) // Using mock users for suggestions for now
         ]);
-        setPosts(feedPostsData);
         setLearningCourses(learningCoursesData);
-        setOtherUsers(otherUsersData.filter(u => u.uid !== currentUser.uid)); // Ensure current user isn't in suggestions
+        setOtherUsers(allUsersData);
         setIsLoadingPageData(false);
       }
     }
     if (!loadingAuth && currentUser) {
         loadData();
     }
-  }, [currentUser, loadingAuth]);
+  }, [currentUser, loadingAuth, fetchAllPosts]);
+
+  const handlePostCreated = () => {
+    fetchAllPosts(); // Refetch posts when a new one is created
+  };
+  
+  const handlePostUpdated = (updatedPost: PostType) => {
+    setPosts(prevPosts => prevPosts.map(p => p.id === updatedPost.id ? updatedPost : p));
+  };
 
 
-  if (loadingAuth || (!currentUser && !loadingAuth)) { // Show loader if auth is pending or if redirecting
+  if (loadingAuth || (!currentUser && !loadingAuth)) { 
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -240,29 +252,30 @@ export default function HomePage() {
     );
   }
   
-  if (!currentUser) return null; // Should be covered by redirect, but as a fallback
+  if (!currentUser) return null; 
 
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-      {/* Left Sidebar */}
       <aside className="md:col-span-1 space-y-4 sticky top-20">
         <ProfileSummaryCard />
       </aside>
 
-      {/* Main Content Feed */}
       <section className="md:col-span-2 space-y-4">
-        <CreatePostCard />
-        {isLoadingPageData ? (
+        <CreatePostCard onPostCreated={handlePostCreated} />
+        {isLoadingPageData && posts.length === 0 ? (
              <div className="flex justify-center items-center min-h-[calc(100vh-20rem)]">
                 <Loader2 className="h-10 w-10 animate-spin text-primary"/>
              </div>
-        ) : posts.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
+        ) : posts.length > 0 ? (
+            posts.map((post) => (
+              <PostCard key={post.id} post={post} onPostUpdated={handlePostUpdated} />
+            ))
+        ) : (
+          !isLoadingPageData && <Card><CardContent className="p-6 text-center text-muted-foreground">No posts yet. Be the first to share something!</CardContent></Card>
+        )}
       </section>
 
-      {/* Right Sidebar */}
       <aside className="md:col-span-1 space-y-4 sticky top-20">
          {isLoadingPageData ? (
             <Card><CardContent className="p-4 h-48 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></CardContent></Card>
@@ -299,9 +312,8 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
         ))}
       </CardContent>
       <CardFooter>
-         <Button variant="ghost" className="w-full text-primary">See all recommendations</Button>
+         <Button variant="ghost" className="w-full text-primary" disabled>See all recommendations</Button>
       </CardFooter>
     </Card>
   )
 }
-

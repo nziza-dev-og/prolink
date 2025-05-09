@@ -61,19 +61,22 @@ export interface Post {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
-  createdAt: string; // ISO date string
+  createdAt: Timestamp | string; // Firestore Timestamp or ISO string
   likesCount: number;
   commentsCount: number;
   repostsCount: number;
-  isLikedByCurrentUser?: boolean;
+  isLikedByCurrentUser?: boolean; // This will be determined client-side based on 'likes' array
+  likes: string[]; // Array of user UIDs who liked the post
   comments?: Comment[];
+  authorId: string; // Firebase UID of the author
 }
 
 export interface Comment {
   id: string;
   author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
+  authorId: string;
   content: string;
-  createdAt: string; // ISO date string
+  createdAt: Timestamp | string; // Firestore Timestamp or ISO string
   likesCount: number;
   isLikedByCurrentUser?: boolean;
 }
@@ -85,9 +88,10 @@ export interface Job {
   location: string;
   employmentType: "Full-time" | "Part-time" | "Contract" | "Internship";
   description: string;
-  postedDate: string; // ISO date string
+  postedDate: Timestamp | string; // Firestore Timestamp or ISO string
   companyLogoUrl?: string;
   skillsRequired?: string[];
+  authorId: string; // Firebase UID of the user who posted the job
 }
 
 export interface Message {

@@ -1,35 +1,40 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { getUserProfile } from "@/lib/user-service"; // Fetches from Firestore
-import { getFeedPosts } from "@/lib/mock-data"; // Still using mock posts for now
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getUserProfile } from "@/lib/user-service"; 
+import { getPostsByAuthorId } from "@/lib/post-service"; 
 import type { UserProfile, WorkExperience, Education, Skill, Post as PostType } from "@/types";
 import { Building, Edit, GraduationCap, Loader2, MessageSquare, Plus, Star, UserPlus } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
+import PostActions from '@/components/posts/post-actions'; // Import PostActions
 
-// Re-using PostCard component (can be extracted later)
-function PostCard({ post }: { post: PostType }) {
+function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (updatedPost: PostType) => void }) {
+   const handleLikeUnlike = (postId: string, newLikes: string[], newLikesCount: number) => {
+    if (post.id === postId) {
+      onPostUpdated({ ...post, likes: newLikes, likesCount: newLikesCount });
+    }
+  };
+
   return (
     <Card className="mb-4">
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
-          <Link href={`/profile/${post.author.id}`}>
+          <Link href={`/profile/${post.author.uid}`}>
             <Avatar>
               <AvatarImage src={post.author.profilePictureUrl} alt={post.author.firstName} data-ai-hint="user avatar"/>
               <AvatarFallback>{post.author.firstName?.charAt(0)}{post.author.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
           </Link>
           <div>
-            <Link href={`/profile/${post.author.id}`} className="font-semibold hover:underline">{post.author.firstName} {post.author.lastName}</Link>
+            <Link href={`/profile/${post.author.uid}`} className="font-semibold hover:underline">{post.author.firstName} {post.author.lastName}</Link>
             <p className="text-xs text-muted-foreground">{post.author.headline}</p>
-            <p className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleDateString()}</p>
+            <p className="text-xs text-muted-foreground">{new Date(post.createdAt as string).toLocaleDateString()}</p>
           </div>
         </div>
       </CardHeader>
@@ -41,7 +46,9 @@ function PostCard({ post }: { post: PostType }) {
           </div>
         )}
       </CardContent>
-      {/* Add PostActions or similar here if needed */}
+      <div className="px-4 pb-3">
+         <PostActions post={post} onLikeUnlike={handleLikeUnlike} />
+      </div>
     </Card>
   );
 }
@@ -57,36 +64,42 @@ export default function UserProfilePage() {
   const [userPosts, setUserPosts] = useState<PostType[]>([]);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
+  const fetchProfileAndPosts = useCallback(async () => {
+    if (userId) {
+      setIsLoadingProfile(true);
+      try {
+        const userProfileData = await getUserProfile(userId);
+        setProfile(userProfileData);
+
+        if (userProfileData) {
+          const postsData = await getPostsByAuthorId(userId);
+          setUserPosts(postsData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch profile data:", error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    }
+  }, [userId]);
+
+
   useEffect(() => {
-    if (!loadingAuth && !loggedInUser && userId) { // ensure userId is checked after router is ready
+    if (!loadingAuth && !loggedInUser && userId) { 
         router.push('/login');
     }
   }, [loggedInUser, loadingAuth, router, userId]);
   
   useEffect(() => {
-    async function fetchProfileData() {
-      if (userId) {
-        setIsLoadingProfile(true);
-        try {
-          const userProfileData = await getUserProfile(userId);
-          setProfile(userProfileData);
-
-          // TODO: Replace with Firestore query for user's posts
-          const allPosts = await getFeedPosts();
-          setUserPosts(allPosts.filter(post => post.author.id === userId));
-
-        } catch (error) {
-          console.error("Failed to fetch profile data:", error);
-          // Optionally, redirect to a 404 page or show an error message
-        } finally {
-          setIsLoadingProfile(false);
-        }
-      }
+    if (!loadingAuth && loggedInUser) { 
+        fetchProfileAndPosts();
     }
-    if (!loadingAuth && loggedInUser) { // Only fetch if auth is resolved and user is logged in
-        fetchProfileData();
-    }
-  }, [userId, loadingAuth, loggedInUser]);
+  }, [userId, loadingAuth, loggedInUser, fetchProfileAndPosts]);
+
+  const handlePostUpdated = (updatedPost: PostType) => {
+    setUserPosts(prevPosts => prevPosts.map(p => p.id === updatedPost.id ? updatedPost : p));
+  };
+
 
   if (loadingAuth || isLoadingProfile) {
     return (
@@ -97,14 +110,13 @@ export default function UserProfilePage() {
   }
 
   if (!profile) {
-    return <div className="text-center py-10">Profile not found or you do not have permission to view it.</div>;
+    return <div className="text-center py-10">Profile not found.</div>;
   }
 
   const isCurrentUserProfile = loggedInUser?.uid === profile.uid;
 
   return (
     <div className="space-y-6">
-      {/* Profile Header Card */}
       <Card className="overflow-hidden">
         <div className="relative h-48 md:h-64 bg-muted">
           {profile.coverPhotoUrl && (
@@ -120,25 +132,25 @@ export default function UserProfilePage() {
             <div className="sm:ml-6 mt-4 sm:mt-0 flex-grow">
               <h1 className="text-2xl sm:text-3xl font-bold">{profile.firstName} {profile.lastName}</h1>
               <p className="text-md text-foreground">{profile.headline}</p>
-              <p className="text-sm text-muted-foreground">{profile.location} 
-                {/* <Link href="#" className="text-primary hover:underline">Contact info</Link> */}
-              </p>
+              <p className="text-sm text-muted-foreground">{profile.location} </p>
               <p className="text-sm text-primary font-semibold hover:underline">
-                <Link href={`/network/connections/${profile.id}`}>{profile.connectionsCount || 0} connections</Link>
+                <Link href={`/network/connections/${profile.uid}`}>{profile.connectionsCount || 0} connections</Link>
               </p>
             </div>
             <div className="mt-4 sm:mt-0 space-x-2 flex items-center">
               {isCurrentUserProfile ? (
                 <>
-                  <Button variant="outline" disabled> {/* TODO: Implement Edit Profile */}
-                    <Edit className="mr-2 h-4 w-4" /> Edit profile
+                  <Button variant="outline" asChild> 
+                    <Link href="/settings">
+                        <Edit className="mr-2 h-4 w-4" /> Edit profile
+                    </Link>
                   </Button>
-                  <Button disabled>Add profile section</Button> {/* TODO: Implement Add Profile Section */}
+                  <Button disabled>Add profile section</Button> 
                 </>
               ) : (
                 <>
-                  <Button disabled><UserPlus className="mr-2 h-4 w-4" /> Connect</Button> {/* TODO: Implement Connect */}
-                  <Button variant="outline" disabled><MessageSquare className="mr-2 h-4 w-4" /> Message</Button> {/* TODO: Implement Message */}
+                  <Button disabled><UserPlus className="mr-2 h-4 w-4" /> Connect</Button> 
+                  <Button variant="outline" disabled><MessageSquare className="mr-2 h-4 w-4" /> Message</Button> 
                 </>
               )}
             </div>
@@ -146,7 +158,6 @@ export default function UserProfilePage() {
         </CardContent>
       </Card>
 
-      {/* About Section */}
       {profile.summary && (
         <Card>
           <CardHeader>
@@ -158,29 +169,24 @@ export default function UserProfilePage() {
         </Card>
       )}
 
-      {/* Activity Section */}
       <Card>
         <CardHeader>
           <CardTitle>Activity</CardTitle>
-          {/* <CardDescription>{profile.connectionsCount || 0} followers</CardDescription> */}
         </CardHeader>
         <CardContent>
           {userPosts.length > 0 ? (
-            userPosts.map(post => <PostCard key={post.id} post={post} />)
+            userPosts.map(post => <ProfilePostCard key={post.id} post={post} onPostUpdated={handlePostUpdated} />)
           ) : (
             <p className="text-sm text-muted-foreground">{profile.firstName} hasn&apos;t posted recently.</p>
           )}
-          {/* {userPosts.length > 0 && <Button variant="link" className="text-primary p-0 h-auto">See all activity</Button>} */}
         </CardContent>
       </Card>
       
-
-      {/* Experience Section */}
       {profile.workExperience && profile.workExperience.length > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Experience</CardTitle>
-            {isCurrentUserProfile && <Button variant="ghost" size="icon" disabled><Plus className="h-5 w-5" /></Button>} {/* TODO: Implement */}
+            {isCurrentUserProfile && <Button variant="ghost" size="icon" disabled><Plus className="h-5 w-5" /></Button>}
           </CardHeader>
           <CardContent className="space-y-6">
             {profile.workExperience.map((exp: WorkExperience) => (
@@ -198,19 +204,18 @@ export default function UserProfilePage() {
                   {exp.location && <p className="text-xs text-muted-foreground">{exp.location}</p>}
                   {exp.description && <p className="text-sm mt-1">{exp.description}</p>}
                 </div>
-                {isCurrentUserProfile && <Button variant="ghost" size="icon" className="ml-auto self-start" disabled><Edit className="h-4 w-4" /></Button>} {/* TODO: Implement */}
+                {isCurrentUserProfile && <Button variant="ghost" size="icon" className="ml-auto self-start" disabled><Edit className="h-4 w-4" /></Button>}
               </div>
             ))}
           </CardContent>
         </Card>
       )}
 
-      {/* Education Section */}
       {profile.education && profile.education.length > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Education</CardTitle>
-             {isCurrentUserProfile && <Button variant="ghost" size="icon" disabled><Plus className="h-5 w-5" /></Button>} {/* TODO: Implement */}
+             {isCurrentUserProfile && <Button variant="ghost" size="icon" disabled><Plus className="h-5 w-5" /></Button>}
           </CardHeader>
           <CardContent className="space-y-6">
             {profile.education.map((edu: Education) => (
@@ -225,26 +230,25 @@ export default function UserProfilePage() {
                   </p>
                    {edu.description && <p className="text-sm mt-1">{edu.description}</p>}
                 </div>
-                {isCurrentUserProfile && <Button variant="ghost" size="icon" className="ml-auto self-start" disabled><Edit className="h-4 w-4" /></Button>} {/* TODO: Implement */}
+                {isCurrentUserProfile && <Button variant="ghost" size="icon" className="ml-auto self-start" disabled><Edit className="h-4 w-4" /></Button>}
               </div>
             ))}
           </CardContent>
         </Card>
       )}
 
-      {/* Skills Section */}
       {profile.skills && profile.skills.length > 0 && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Skills</CardTitle>
-            {isCurrentUserProfile && <Button variant="outline" size="sm" disabled>Add new skill</Button>} {/* TODO: Implement */}
+            {isCurrentUserProfile && <Button variant="outline" size="sm" disabled>Add new skill</Button>}
           </CardHeader>
           <CardContent className="space-y-4">
-            {profile.skills.slice(0, 5).map((skill: Skill) => ( // Show top 5 skills, for example
+            {profile.skills.slice(0, 5).map((skill: Skill) => ( 
               <div key={skill.id} className="pb-2">
                 <div className="flex justify-between items-center">
                   <h4 className="font-semibold text-sm">{skill.name}</h4>
-                  {isCurrentUserProfile && <Button variant="ghost" size="icon" className="h-7 w-7" disabled><Edit className="h-4 w-4" /></Button>} {/* TODO: Implement */}
+                  {isCurrentUserProfile && <Button variant="ghost" size="icon" className="h-7 w-7" disabled><Edit className="h-4 w-4" /></Button>}
                 </div>
                 {skill.endorsements && skill.endorsements > 0 && (
                    <div className="flex items-center text-xs text-muted-foreground mt-1">
