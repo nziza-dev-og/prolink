@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from './firebase';
@@ -15,6 +16,7 @@ import {
   Timestamp,
   where,
   increment,
+  writeBatch,
 } from 'firebase/firestore';
 import type { Post, Comment, UserProfile } from '@/types';
 import { getUserProfile } from './user-service'; 
@@ -43,7 +45,7 @@ export async function getPosts(): Promise<Post[]> {
     querySnapshot.docs.map(async (docSnapshot) => {
       const data = docSnapshot.data();
       let authorInfo: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl"> = {
-        id: data.authorId, // Use authorId from post data as fallback
+        id: data.authorId, 
         uid: data.authorId,
         firstName: 'Unknown',
         lastName: 'User',
@@ -55,7 +57,7 @@ export async function getPosts(): Promise<Post[]> {
         const authorProfile = await getUserProfile(data.authorId);
         if (authorProfile) {
           authorInfo = {
-            id: authorProfile.uid, // Ensure 'id' in author object is the user's main ID (uid)
+            id: authorProfile.uid, 
             uid: authorProfile.uid,
             firstName: authorProfile.firstName,
             lastName: authorProfile.lastName,
@@ -69,7 +71,7 @@ export async function getPosts(): Promise<Post[]> {
         ...data,
         id: docSnapshot.id,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
-        author: authorInfo, // author is now correctly populated
+        author: authorInfo,
         likes: data.likes || [],
         likesCount: data.likesCount || 0,
         commentsCount: data.commentsCount || 0,
@@ -142,26 +144,31 @@ export async function unlikePost(postId: string, userId: string): Promise<void> 
 
 export async function addComment(
   postId: string,
-  commentData: Omit<Comment, 'id' | 'createdAt' | 'likesCount' | 'isLikedByCurrentUser'>
+  commentData: Omit<Comment, 'id' | 'createdAt' | 'author' | 'likesCount' | 'isLikedByCurrentUser'>
 ): Promise<string> {
   const commentsCollectionRef = collection(db, 'posts', postId, 'comments');
   const postRef = doc(db, 'posts', postId);
   
-  const docRef = await addDoc(commentsCollectionRef, {
+  const batch = writeBatch(db);
+
+  const newCommentRef = doc(commentsCollectionRef); // Generate new doc ref for comment
+  batch.set(newCommentRef, {
     ...commentData,
     createdAt: serverTimestamp(),
     likesCount: 0,
   });
 
-  await updateDoc(postRef, {
+  batch.update(postRef, {
     commentsCount: increment(1),
   });
-  return docRef.id;
+
+  await batch.commit();
+  return newCommentRef.id;
 }
 
 export async function getComments(postId: string): Promise<Comment[]> {
   const commentsCollectionRef = collection(db, 'posts', postId, 'comments');
-  const q = query(commentsCollectionRef, orderBy('createdAt', 'asc'));
+  const q = query(commentsCollectionRef, orderBy('createdAt', 'asc')); // Fetch newest last for typical display
   const querySnapshot = await getDocs(q);
   
   const commentsWithAuthors = await Promise.all(
@@ -194,11 +201,34 @@ export async function getComments(postId: string): Promise<Comment[]> {
         ...data,
         id: docSnapshot.id,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
-        author: authorInfo,
+        author: authorInfo, // Ensure author object has uid
       } as Comment;
     })
   );
   return commentsWithAuthors;
+}
+
+export async function repostPost(postId: string, userId: string): Promise<void> {
+  const postRef = doc(db, 'posts', postId);
+  // For simplicity, we just increment a counter.
+  // A more complex system might create a new post referencing the original or add to a `repostedBy` array.
+  await updateDoc(postRef, {
+    repostsCount: increment(1),
+    // Optionally, track who reposted if needed for other features:
+    // repostedBy: arrayUnion(userId) 
+  });
+
+  // If you want to create a new post for the repost:
+  // const originalPostSnap = await getDoc(postRef);
+  // if (originalPostSnap.exists()) {
+  //   const originalPostData = originalPostSnap.data();
+  //   await createPost({
+  //     authorId: userId, // The user who is reposting
+  //     content: `Reposted: ${originalPostData.content}`, // Or some other indicator
+  //     originalPostId: postId, // Link to the original post
+  //     // ... other fields like imageUrl might be copied or handled differently
+  //   });
+  // }
 }
 
 export async function getTotalPostsCount(): Promise<number> {
@@ -206,3 +236,4 @@ export async function getTotalPostsCount(): Promise<number> {
   const querySnapshot = await getDocs(postsCollectionRef);
   return querySnapshot.size;
 }
+

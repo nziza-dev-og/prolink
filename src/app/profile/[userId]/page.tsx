@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -13,11 +14,25 @@ import type { UserProfile, WorkExperience, Education, Skill, Post as PostType } 
 import { Building, Edit, GraduationCap, Loader2, MessageSquare, Plus, Star, UserPlus } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 import PostActions from '@/components/posts/post-actions'; 
+import CommentSection from '@/components/posts/comment-section';
+
 
 function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (updatedPost: PostType) => void }) {
-   const handleLikeUnlike = (postId: string, newLikes: string[], newLikesCount: number) => {
+  const [showComments, setShowComments] = useState(false);
+
+  const handleLikeUnlike = (postId: string, newLikes: string[], newLikesCount: number) => {
     if (post.id === postId) {
       onPostUpdated({ ...post, likes: newLikes, likesCount: newLikesCount });
+    }
+  };
+
+  const handleCommentAdded = (updatedPostWithNewCommentCount: PostType) => {
+     onPostUpdated(updatedPostWithNewCommentCount);
+  }
+
+  const handleRepost = (postId: string, newRepostsCount: number) => {
+    if (post.id === postId) {
+      onPostUpdated({ ...post, repostsCount: newRepostsCount });
     }
   };
 
@@ -79,9 +94,22 @@ function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdate
           </div>
         )}
       </CardContent>
+       <div className="px-4 pb-2 pt-0 text-xs text-muted-foreground flex justify-between">
+           <span>{post.likesCount || 0} Likes</span>
+            <button onClick={() => setShowComments(!showComments)} className="hover:underline">
+                {post.commentsCount || 0} Comments
+            </button>
+           <span>{post.repostsCount || 0} Reposts</span>
+       </div>
       <div className="px-4 pb-3">
-         <PostActions post={post} onLikeUnlike={handleLikeUnlike} />
+         <PostActions 
+            post={post} 
+            onLikeUnlike={handleLikeUnlike} 
+            onCommentAction={() => setShowComments(!showComments)}
+            onRepost={handleRepost}
+          />
       </div>
+      {showComments && <CommentSection post={post} onCommentAdded={handleCommentAdded} />}
     </Card>
   );
 }
@@ -182,8 +210,8 @@ export default function UserProfilePage() {
                 </>
               ) : (
                 <>
-                  <Button disabled><UserPlus className="mr-2 h-4 w-4" /> Connect</Button> 
-                  <Button variant="outline" disabled><MessageSquare className="mr-2 h-4 w-4" /> Message</Button> 
+                  <Button asChild><Link href={`/network?search=${profile.firstName}%20${profile.lastName}`}><UserPlus className="mr-2 h-4 w-4" /> Connect</Link></Button> 
+                  <Button variant="outline" asChild><Link href={`/messaging?chatWith=${profile.uid}`}><MessageSquare className="mr-2 h-4 w-4" /> Message</Link></Button> 
                 </>
               )}
             </div>

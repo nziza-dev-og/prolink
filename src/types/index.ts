@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export interface UserProfile {
@@ -72,18 +73,18 @@ export interface Post {
   repostsCount: number;
   isLikedByCurrentUser?: boolean; 
   likes: string[]; 
-  comments?: Comment[];
+  comments?: Comment[]; // Array of full Comment objects
   authorId: string; 
 }
 
 export interface Comment {
   id: string;
-  author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
-  authorId: string;
+  author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">; // Full author details for display
+  authorId: string; // Stored for querying
   content: string;
   createdAt: Timestamp | string; 
   likesCount: number;
-  isLikedByCurrentUser?: boolean;
+  isLikedByCurrentUser?: boolean; // Optional: for UI indication if current user liked this comment
 }
 
 export interface Job {
@@ -140,3 +141,4 @@ export interface Invitation {
     createdAt: Timestamp | string;
     updatedAt?: Timestamp | string;
 }
+

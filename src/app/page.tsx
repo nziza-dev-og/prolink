@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -14,6 +15,7 @@ import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Re
 import { useAuth } from '@/context/auth-context';
 import CreatePostDialog from '@/components/posts/create-post-dialog';
 import PostActions from '@/components/posts/post-actions'; 
+import CommentSection from '@/components/posts/comment-section';
 
 function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
   const { currentUser, loadingAuth } = useAuth();
@@ -63,9 +65,21 @@ function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
 }
 
 function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (updatedPost: PostType) => void }) {
+  const [showComments, setShowComments] = useState(false);
+
   const handleLikeUnlike = (postId: string, newLikes: string[], newLikesCount: number) => {
     if (post.id === postId) {
       onPostUpdated({ ...post, likes: newLikes, likesCount: newLikesCount });
+    }
+  };
+
+  const handleCommentAdded = (updatedPostWithNewCommentCount: PostType) => {
+     onPostUpdated(updatedPostWithNewCommentCount);
+  }
+
+  const handleRepost = (postId: string, newRepostsCount: number) => {
+    if (post.id === postId) {
+      onPostUpdated({ ...post, repostsCount: newRepostsCount });
     }
   };
   
@@ -130,13 +144,21 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
       <CardFooter className="px-4 pb-2 pt-0">
         <div className="flex justify-between w-full text-xs text-muted-foreground">
           <span>{post.likesCount || 0} Likes</span>
-          <span>{post.commentsCount || 0} Comments</span>
+          <button onClick={() => setShowComments(!showComments)} className="hover:underline">
+            {post.commentsCount || 0} Comments
+          </button>
           <span>{post.repostsCount || 0} Reposts</span>
         </div>
       </CardFooter>
       <div className="px-4 pb-3">
-         <PostActions post={post} onLikeUnlike={handleLikeUnlike} />
+         <PostActions 
+            post={post} 
+            onLikeUnlike={handleLikeUnlike} 
+            onCommentAction={() => setShowComments(!showComments)}
+            onRepost={handleRepost}
+         />
       </div>
+      {showComments && <CommentSection post={post} onCommentAdded={handleCommentAdded} />}
     </Card>
   );
 }
@@ -170,7 +192,6 @@ function ProfileSummaryCard() {
           </Link>
            <Link href={`/network?tab=invitations`} className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
             <span>Invitations</span>
-             {/* Mock data for invitations count, replace with actual data if available */}
             <span className="text-primary font-semibold">{currentUser.pendingInvitationsCount || 0}</span>
           </Link>
         </div>
@@ -191,18 +212,17 @@ function PeopleMayKnowCard() {
   const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
 
   useEffect(() => {
-    // This is mock data. In a real app, fetch suggestions from a service.
     if (currentUser) {
       const currentUserLocation = currentUser.location;
       const currentUserConnections = currentUser.connections || [];
-      const currentUserPendingInvitations = currentUser.pendingInvitations || []; // Assuming this field exists
+      const currentUserPendingInvitations = currentUser.pendingInvitations || []; 
       
       const filteredSuggestions = mockUserProfiles.filter(p => 
         p.uid !== currentUser.uid && 
         !currentUserConnections.includes(p.uid) &&
-        !currentUserPendingInvitations.some(invId => invId === p.uid) && // Don't suggest if already invited
+        !currentUserPendingInvitations.some(invId => invId === p.uid) && 
         (currentUserLocation ? p.location === currentUserLocation : true) 
-      ).slice(0,3); // Limit to 3 suggestions
+      ).slice(0,3);
       setSuggestions(filteredSuggestions);
     }
   }, [currentUser]);
@@ -228,8 +248,10 @@ function PeopleMayKnowCard() {
               <Link href={`/profile/${person.uid}`} className="font-semibold text-sm hover:underline">{person.firstName} {person.lastName}</Link>
               <p className="text-xs text-muted-foreground">{person.headline}</p>
             </div>
-            <Button variant="outline" size="sm" disabled> {/* Connect functionality to be implemented */}
-              <Link2 className="h-4 w-4 mr-1" /> Connect
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/network?search=${person.firstName}%20${person.lastName}`}>
+                <Link2 className="h-4 w-4 mr-1" /> Connect
+              </Link>
             </Button>
           </div>
         ))}
@@ -249,24 +271,20 @@ export default function HomePage() {
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostType[]>([]);
-  // const [allLearningCourses, setAllLearningCourses] = useState<LearningCourse[]>([]); // Keep if needed for other features
   const [recommendedCourses, setRecommendedCourses] = useState<LearningCourse[]>([]);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
 
-  const fetchUserSpecificPosts = useCallback(async () => {
+  const fetchFeedPosts = useCallback(async () => {
     if (!currentUser) return; 
     setIsLoadingPageData(true);
     try {
-      // Fetch posts specifically by the current user for their feed
-      const userPostsData = await getPostsByAuthorId(currentUser.uid);
-      const allPostsData = await getPosts(); // Fetch all posts to show in feed as well
+      // For the main feed, fetch posts from everyone or a curated selection.
+      // Here, we fetch all posts. For a real app, this would be paginated and curated.
+      const allPostsData = await getPosts(); 
       
-      // Combine user's posts with others, ensuring no duplicates and sorting
-      const combinedPosts = [...userPostsData, ...allPostsData.filter(p => p.authorId !== currentUser.uid)];
-      const uniquePosts = Array.from(new Map(combinedPosts.map(p => [p.id, p])).values());
-      uniquePosts.sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
+      allPostsData.sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
       
-      setPosts(uniquePosts);
+      setPosts(allPostsData);
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
@@ -284,20 +302,17 @@ export default function HomePage() {
     async function loadInitialData() {
       if (currentUser) { 
         setIsLoadingPageData(true); 
-        await fetchUserSpecificPosts(); 
+        await fetchFeedPosts(); 
         
         const learningCoursesData = await fetchLearningCourses();
-        // setAllLearningCourses(learningCoursesData); // Keep if needed elsewhere
-        
-        // Simulate learning recommendations based on user skills
         const userSkills = currentUser.skills?.map(skill => skill.name.toLowerCase()) || [];
         if (userSkills.length > 0 && learningCoursesData.length > 0) {
             const matchingCourses = learningCoursesData.filter(course => 
                 course.keywords?.some(keyword => userSkills.includes(keyword.toLowerCase()))
-            ).slice(0,2); // Limit to 2 recommendations
+            ).slice(0,2); 
             setRecommendedCourses(matchingCourses.length > 0 ? matchingCourses : learningCoursesData.slice(0,2));
         } else {
-            setRecommendedCourses(learningCoursesData.slice(0,2)); // Default if no skills or matches
+            setRecommendedCourses(learningCoursesData.slice(0,2)); 
         }
         setIsLoadingPageData(false); 
       }
@@ -305,10 +320,10 @@ export default function HomePage() {
     if (!loadingAuth && currentUser) {
         loadInitialData();
     }
-  }, [currentUser, loadingAuth, fetchUserSpecificPosts]);
+  }, [currentUser, loadingAuth, fetchFeedPosts]);
 
   const handlePostCreated = () => {
-    fetchUserSpecificPosts(); 
+    fetchFeedPosts(); 
   };
   
   const handlePostUpdated = (updatedPost: PostType) => {
