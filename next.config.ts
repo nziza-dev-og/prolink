@@ -27,6 +27,12 @@ const nextConfig: NextConfig = {
         hostname: '*.appspot.com', // General rule for appspot domains
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i.pinimg.com',
+        port: '',
+        pathname: '/**',
       }
     ],
   },
