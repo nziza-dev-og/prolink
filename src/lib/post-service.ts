@@ -40,10 +40,11 @@ export async function getPosts(): Promise<Post[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
+    // Ensure 'id' is the Firestore document ID and 'createdAt' is a string.
     return {
-      id: doc.id,
-      ...data,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+      ...data, // Spread original data first
+      id: doc.id, // Override with Firestore document ID to ensure uniqueness
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
     } as Post;
   });
 }
@@ -54,10 +55,11 @@ export async function getPostsByAuthorId(authorId: string): Promise<Post[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
+    // Ensure 'id' is the Firestore document ID and 'createdAt' is a string.
     return {
-      id: doc.id,
-      ...data,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+      ...data, // Spread original data first
+      id: doc.id, // Override with Firestore document ID to ensure uniqueness
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
     } as Post;
   });
 }
@@ -105,9 +107,9 @@ export async function getComments(postId: string): Promise<Comment[]> {
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
     return {
-      id: doc.id,
-      ...data,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt,
+      ...data, // Spread original data first
+      id: doc.id, // Override with Firestore document ID to ensure uniqueness
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
     } as Comment;
   });
 }

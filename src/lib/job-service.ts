@@ -31,10 +31,11 @@ export async function getAllJobs(): Promise<Job[]> {
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
+    // Ensure 'id' is the Firestore document ID and 'postedDate' is a string.
     return {
-      id: doc.id,
-      ...data,
-      postedDate: data.postedDate instanceof Timestamp ? data.postedDate.toDate().toISOString() : data.postedDate,
+      ...data, // Spread original data first
+      id: doc.id, // Override with Firestore document ID to ensure uniqueness
+      postedDate: data.postedDate instanceof Timestamp ? data.postedDate.toDate().toISOString() : String(data.postedDate),
     } as Job;
   });
 }
@@ -45,10 +46,11 @@ export async function getJobById(jobId: string): Promise<Job | null> {
 
   if (docSnap.exists()) {
     const data = docSnap.data();
+    // Ensure 'id' is the Firestore document ID and 'postedDate' is a string.
     return {
-      id: docSnap.id,
-      ...data,
-      postedDate: data.postedDate instanceof Timestamp ? data.postedDate.toDate().toISOString() : data.postedDate,
+      ...data, // Spread original data first
+      id: docSnap.id, // Override with Firestore document ID to ensure uniqueness
+      postedDate: data.postedDate instanceof Timestamp ? data.postedDate.toDate().toISOString() : String(data.postedDate),
     } as Job;
   } else {
     return null;
