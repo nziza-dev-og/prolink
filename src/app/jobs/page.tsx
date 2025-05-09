@@ -96,7 +96,7 @@ export default function JobsPage() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-      <aside className="md:col-span-1 space-y-4 sticky top-20">
+      <aside className="md:col-span-1 space-y-4 md:sticky top-20 order-1 md:order-none">
         <Card>
           <CardContent className="p-4 space-y-2">
             <Button variant="ghost" className="w-full justify-start text-md font-normal" disabled>
@@ -118,7 +118,7 @@ export default function JobsPage() {
         </Button>
       </aside>
 
-      <section className="md:col-span-3 space-y-6">
+      <section className="md:col-span-3 space-y-6 order-2 md:order-none">
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row gap-2">

@@ -21,6 +21,7 @@ import {
   writeBatch,
   deleteDoc,
   limit,
+  documentId, 
 } from 'firebase/firestore';
 
 export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections' | 'pendingInvitationsCount' | 'pendingInvitations' | 'suggestedConnections'>): Promise<void> {
@@ -94,23 +95,25 @@ export async function updateUserProfile(userId: string, data: Partial<Omit<UserP
   
   updateData.updatedAt = serverTimestamp();
 
-  // Specific handling for profilePictureUrl
-  // This key will be present if the form field for profilePictureUrl was part of the submitted values.
   if (data.hasOwnProperty('profilePictureUrl')) {
-    if (data.profilePictureUrl === '' || data.profilePictureUrl === null || data.profilePictureUrl === undefined) {
-      // If user explicitly clears the URL or it's passed as null/undefined, set to a default.
-      updateData.profilePictureUrl = `https://picsum.photos/seed/${userId}/200/200`; // Consistent default
+    if (!data.profilePictureUrl) { // Handles empty string, null, undefined
+      updateData.profilePictureUrl = `https://picsum.photos/seed/${userId}/200/200`; 
+    } else {
+      updateData.profilePictureUrl = data.profilePictureUrl;
     }
-    // If a valid URL string is provided in data.profilePictureUrl, 
-    // it's already correctly set in updateData due to the initial spread `...data`.
-    // Zod validation on the client should ensure it's a valid URL if not empty/undefined.
   }
   
-  // If connections array is part of the update, update connectionsCount
+  if (data.hasOwnProperty('coverPhotoUrl')) {
+    if (!data.coverPhotoUrl) {
+        updateData.coverPhotoUrl = `https://picsum.photos/seed/${userId}cover/800/200`;
+    } else {
+        updateData.coverPhotoUrl = data.coverPhotoUrl;
+    }
+  }
+  
   if (data.connections && Array.isArray(data.connections)) {
     updateData.connectionsCount = data.connections.length;
   }
-   // If pendingInvitations array is part of the update, update pendingInvitationsCount
   if (data.pendingInvitations && Array.isArray(data.pendingInvitations)) {
     updateData.pendingInvitationsCount = data.pendingInvitations.length;
   }
@@ -129,136 +132,114 @@ export async function getAllUserProfiles(): Promise<UserProfile[]> {
   const querySnapshot = await getDocs(query(usersCollectionRef, orderBy('createdAt', 'desc')));
   
   return Promise.all(querySnapshot.docs.map(async (docSnapshot) => {
-    // Using getUserProfile to ensure consistent data transformation, including date conversions.
-    return (await getUserProfile(docSnapshot.id)) as UserProfile; // Type assertion might be needed if getUserProfile can return null
+    const profile = await getUserProfile(docSnapshot.id);
+    return profile as UserProfile; 
   }));
 }
 
-// Searches user profiles by first name, last name, or email.
-// Excludes the current user from results.
 export async function searchUserProfiles(searchTerm: string, currentUserId: string): Promise<UserProfile[]> {
   if (!searchTerm.trim()) {
     return [];
   }
   const lowerSearchTerm = searchTerm.toLowerCase();
   const usersCollectionRef = collection(db, 'users');
-  const profilesMap = new Map<string, UserProfile>(); // Use a map to avoid duplicates
+  const profilesMap = new Map<string, UserProfile>();
 
-  // Query by email (exact match, case-sensitive in Firestore by default, but email stored as lowercase)
-  const emailQuery = query(usersCollectionRef, where('email', '==', lowerSearchTerm));
-  const emailSnap = await getDocs(emailQuery);
-  for (const docSnap of emailSnap.docs) {
-    if (docSnap.id !== currentUserId) { // Exclude current user
-      const profile = await getUserProfile(docSnap.id); // Use existing function for consistency
-      if (profile) profilesMap.set(docSnap.id, profile);
-    }
-  }
+  const nameQueries = [searchTerm, searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1)]; 
 
-  // Query by first name (prefix match, case-insensitive by capitalizing first letter)
-  // Firestore string queries are case-sensitive. For case-insensitive, you'd usually store a lowercase version.
-  // Here, we simulate a basic prefix search for names starting with the searchTerm.
-  // For more robust search, consider a dedicated search service like Algolia or Elasticsearch.
-  const nameQueries = [searchTerm, searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1)]; // Try both exact and capitalized
-
+  // Search by first name (case-insensitive through multiple queries or backend function)
+  // For simplicity, this example performs a basic prefix search on stored case.
+  // For a true case-insensitive search, store a lowercase version of names.
   for (const term of nameQueries) {
       const firstNameQuery = query(
         usersCollectionRef,
         where('firstName', '>=', term),
-        where('firstName', '<=', term + '\uf8ff') // '\uf8ff' is a high-coded Unicode character for prefix matching
+        where('firstName', '<=', term + '\uf8ff'),
+        limit(10)
       );
       const firstNameSnap = await getDocs(firstNameQuery);
       for (const docSnap of firstNameSnap.docs) {
-        if (docSnap.id !== currentUserId && !profilesMap.has(docSnap.id)) { // Exclude current user and duplicates
+        if (docSnap.id !== currentUserId && !profilesMap.has(docSnap.id)) {
           const profile = await getUserProfile(docSnap.id);
           if (profile) profilesMap.set(docSnap.id, profile);
         }
       }
 
-      // Query by last name (prefix match)
       const lastNameQuery = query(
         usersCollectionRef,
         where('lastName', '>=', term),
-        where('lastName', '<=', term + '\uf8ff')
+        where('lastName', '<=', term + '\uf8ff'),
+        limit(10)
       );
       const lastNameSnap = await getDocs(lastNameQuery);
       for (const docSnap of lastNameSnap.docs) {
-        if (docSnap.id !== currentUserId && !profilesMap.has(docSnap.id)) { // Exclude current user and duplicates
+        if (docSnap.id !== currentUserId && !profilesMap.has(docSnap.id)) {
           const profile = await getUserProfile(docSnap.id);
           if (profile) profilesMap.set(docSnap.id, profile);
         }
       }
   }
   
-  // Return up to a certain limit, e.g., 10 results
+  // Search by email (exact match, assuming email stored as is)
+  const emailQuery = query(usersCollectionRef, where('email', '==', searchTerm), limit(10)); // Emails are often case-sensitive or stored lowercase
+  const emailSnap = await getDocs(emailQuery);
+  for (const docSnap of emailSnap.docs) {
+    if (docSnap.id !== currentUserId && !profilesMap.has(docSnap.id)) {
+      const profile = await getUserProfile(docSnap.id);
+      if (profile) profilesMap.set(docSnap.id, profile);
+    }
+  }
+  
   return Array.from(profilesMap.values()).slice(0, 10);
 }
 
 
-// Sends a connection request from fromUserId to toUserId.
-// Returns the ID of the created invitation or a status string if already connected/pending.
 export async function sendConnectionRequest(fromUserId: string, toUserId: string): Promise<string | 'already_connected' | 'already_sent' | 'already_received' | null> {
-  // Check if users are already connected directly in their profiles
   const fromUserProfile = await getUserProfile(fromUserId);
   if (fromUserProfile?.connections?.includes(toUserId)) {
-    console.log('Users are already connected (checked from user profile).');
     return 'already_connected';
   }
 
-  // Check existing invitations between these two users
   const existingInvitationQuery = query(
     collection(db, 'invitations'),
     where('fromUserId', 'in', [fromUserId, toUserId]),
     where('toUserId', 'in', [fromUserId, toUserId])
-    // where('status', 'in', ['pending', 'accepted']) // Check for pending or already accepted
   );
   const existingInvitationSnap = await getDocs(existingInvitationQuery);
 
   for (const docSnap of existingInvitationSnap.docs) {
     const inv = docSnap.data();
-    if (inv.status === 'accepted') {
-      console.log('Users are already connected (invitation accepted).');
-      return 'already_connected';
-    }
+    if (inv.status === 'accepted') return 'already_connected';
     if (inv.status === 'pending') {
-      if (inv.fromUserId === fromUserId && inv.toUserId === toUserId) {
-        console.log('Invitation already sent.');
-        return 'already_sent';
-      }
-      if (inv.fromUserId === toUserId && inv.toUserId === fromUserId) {
-        // An invitation from the target user to the current user already exists.
-        console.log('Invitation already received. Users should accept it.');
-        return 'already_received';
-      }
+      if (inv.fromUserId === fromUserId && inv.toUserId === toUserId) return 'already_sent';
+      if (inv.fromUserId === toUserId && inv.toUserId === fromUserId) return 'already_received';
     }
   }
 
-  // If no existing connection or pending invitation, create a new one
   const invitationRef = collection(db, 'invitations');
   const newInvitation = {
     fromUserId,
     toUserId,
-    status: 'pending' as const, // Ensure status is of literal type 'pending'
+    status: 'pending' as const,
     createdAt: serverTimestamp(),
   };
   const docRef = await addDoc(invitationRef, newInvitation);
   
-  // Update target user's pending invitations count and list
   const toUserRef = doc(db, 'users', toUserId);
   await updateDoc(toUserRef, {
     pendingInvitationsCount: increment(1),
-    pendingInvitations: arrayUnion(docRef.id) // Store invitation ID
+    pendingInvitations: arrayUnion(docRef.id) 
   });
 
-  return docRef.id; // Return the new invitation ID
+  return docRef.id;
 }
 
 export async function getInvitationStatus(
   currentUserId: string,
   targetUserId: string
 ): Promise<{ status: 'not_connected' | 'pending_sent' | 'pending_received' | 'connected' | 'unknown', invitationId?: string }> {
-  if (currentUserId === targetUserId) return { status: 'unknown' }; // Cannot connect to self
+  if (currentUserId === targetUserId) return { status: 'unknown' };
 
-  // Check if already connected
   const currentUserProfile = await getUserProfile(currentUserId);
   if (currentUserProfile?.connections?.includes(targetUserId)) {
     return { status: 'connected' };
@@ -266,7 +247,6 @@ export async function getInvitationStatus(
 
   const invitationsRef = collection(db, 'invitations');
 
-  // Check if current user has sent a pending request to target user
   const sentQuery = query(
     invitationsRef,
     where('fromUserId', '==', currentUserId),
@@ -278,7 +258,6 @@ export async function getInvitationStatus(
     return { status: 'pending_sent', invitationId: sentSnap.docs[0].id };
   }
 
-  // Check if current user has received a pending request from target user
   const receivedQuery = query(
     invitationsRef,
     where('fromUserId', '==', targetUserId),
@@ -290,7 +269,6 @@ export async function getInvitationStatus(
     return { status: 'pending_received', invitationId: receivedSnap.docs[0].id };
   }
   
-  // Double check if an accepted invitation exists (edge case if direct connection check failed)
   const acceptedQuery = query(
     invitationsRef,
     where('fromUserId', 'in', [currentUserId, targetUserId]),
@@ -299,47 +277,38 @@ export async function getInvitationStatus(
   );
   const acceptedSnap = await getDocs(acceptedQuery);
   if(!acceptedSnap.empty){
-      // This implies they are connected through a past invitation. Sync profiles if needed.
       return {status: 'connected'};
   }
 
   return { status: 'not_connected' };
 }
 
-// Accepts a connection request.
 export async function acceptConnectionRequest(invitationId: string, currentUserId: string, requestingUserId: string): Promise<void> {
   const batch = writeBatch(db);
-
-  // Update invitation status
   const invitationRef = doc(db, 'invitations', invitationId);
   batch.update(invitationRef, { status: 'accepted', updatedAt: serverTimestamp() });
 
-  // Add connection to current user
   const currentUserRef = doc(db, 'users', currentUserId);
   batch.update(currentUserRef, {
     connections: arrayUnion(requestingUserId),
     connectionsCount: increment(1),
-    pendingInvitationsCount: increment(-1), // Decrement pending count
-    pendingInvitations: arrayRemove(invitationId) // Remove from pending list
+    pendingInvitationsCount: increment(-1), 
+    pendingInvitations: arrayRemove(invitationId) 
   });
 
-  // Add connection to requesting user
   const requestingUserRef = doc(db, 'users', requestingUserId);
   batch.update(requestingUserRef, {
     connections: arrayUnion(currentUserId),
     connectionsCount: increment(1)
-    // No change to pendingInvitationsCount for the sender of the original request
   });
 
   await batch.commit();
 }
 
-// Cancels a sent connection request.
 export async function cancelConnectionRequest(invitationId: string, toUserId?: string): Promise<void> {
   const invitationRef = doc(db, 'invitations', invitationId);
   const invitationSnap = await getDoc(invitationRef);
 
-  // If the request was pending and we have the recipient's ID, update their pending count
   if (invitationSnap.exists() && invitationSnap.data()?.status === 'pending' && toUserId) {
     const toUserRef = doc(db, 'users', toUserId);
     await updateDoc(toUserRef, {
@@ -347,18 +316,13 @@ export async function cancelConnectionRequest(invitationId: string, toUserId?: s
       pendingInvitations: arrayRemove(invitationId)
     });
   }
-  // Delete the invitation document regardless
   await deleteDoc(invitationRef);
 }
 
-
-// Ignores a received connection request.
 export async function ignoreConnectionRequest(invitationId: string, currentUserId: string): Promise<void> {
-  // Update invitation status to 'ignored'
   const invitationRef = doc(db, 'invitations', invitationId);
   await updateDoc(invitationRef, { status: 'ignored', updatedAt: serverTimestamp() });
 
-  // Update current user's pending invitations count
   const currentUserRef = doc(db, 'users', currentUserId);
   await updateDoc(currentUserRef, {
     pendingInvitationsCount: increment(-1),
@@ -366,8 +330,6 @@ export async function ignoreConnectionRequest(invitationId: string, currentUserI
   });
 }
 
-
-// Fetches profiles of users who have sent pending invitations to the given userId.
 export async function getPendingInvitations(userId: string): Promise<(UserProfile & {invitationId: string})[]> {
     const invitationsRef = collection(db, 'invitations');
     const q = query(invitationsRef, where('toUserId', '==', userId), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
@@ -384,7 +346,6 @@ export async function getPendingInvitations(userId: string): Promise<(UserProfil
     return usersFromInvitations;
 }
 
-// Fetches "friends of friends" suggestions for a user.
 export async function getFriendsOfFriendsSuggestions(currentUserId: string, resultLimit: number = 5): Promise<UserProfile[]> {
   const currentUserProfile = await getUserProfile(currentUserId);
   if (!currentUserProfile || !currentUserProfile.connections || currentUserProfile.connections.length === 0) {
@@ -392,11 +353,9 @@ export async function getFriendsOfFriendsSuggestions(currentUserId: string, resu
   }
 
   const currentUserConnectionsSet = new Set(currentUserProfile.connections);
-  currentUserConnectionsSet.add(currentUserId); // Add current user to avoid suggesting self
+  currentUserConnectionsSet.add(currentUserId); 
 
   const friendsOfFriendsUids = new Set<string>();
-
-  // Limit the number of first-degree connections to process to avoid excessive reads
   const connectionsToProcess = currentUserProfile.connections.slice(0, 10); 
 
   for (const friendId of connectionsToProcess) {
@@ -410,19 +369,50 @@ export async function getFriendsOfFriendsSuggestions(currentUserId: string, resu
     }
   }
   
-  // Fetch profiles for the suggested UIDs, up to the limit
   const suggestedProfiles: UserProfile[] = [];
   for (const uid of Array.from(friendsOfFriendsUids)) {
     if (suggestedProfiles.length >= resultLimit) break;
     const profile = await getUserProfile(uid);
     if (profile) {
-      // Final check to ensure this user is not already connected or has a pending invite with currentUser
       const invitationStatus = await getInvitationStatus(currentUserId, profile.uid);
       if (invitationStatus.status === 'not_connected') {
         suggestedProfiles.push(profile);
       }
     }
   }
-
   return suggestedProfiles;
 }
+
+export async function getUserProfileByLocation(location: string, currentUserId: string, resultLimit: number): Promise<UserProfile[]> {
+  if (!location.trim()) {
+    return [];
+  }
+  const usersCollectionRef = collection(db, 'users');
+  // Fetch a bit more to allow filtering out currentUserId if they happen to match the location
+  const q = query(
+    usersCollectionRef, 
+    where('location', '==', location), 
+    // where(documentId(), '!=', currentUserId) // Not always efficient, filter client-side
+    limit(resultLimit + 5) // fetch a bit more to filter out current user and ensure limit
+  );
+
+  const querySnapshot = await getDocs(q);
+  const profiles: UserProfile[] = [];
+
+  for (const docSnap of querySnapshot.docs) {
+    if (docSnap.id === currentUserId) {
+      continue; // Skip current user
+    }
+    const profileData = await getUserProfile(docSnap.id); // Use existing function for consistency
+    if (profileData) {
+      profiles.push(profileData);
+      if (profiles.length >= resultLimit) {
+        break; // Stop once limit is reached
+      }
+    }
+  }
+  return profiles;
+}
+
+
+    

@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -9,7 +7,7 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLearningCourses } from "@/lib/mock-data"; 
+import { getLearningCourses as fetchLearningCourses } from "@/lib/mock-data"; 
 import { getPosts } from '@/lib/post-service'; 
 import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
 import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
@@ -17,7 +15,7 @@ import { useAuth } from '@/context/auth-context';
 import CreatePostDialog from '@/components/posts/create-post-dialog';
 import PostActions from '@/components/posts/post-actions'; 
 import CommentSection from '@/components/posts/comment-section';
-import { getFriendsOfFriendsSuggestions } from '@/lib/user-service';
+import { getFriendsOfFriendsSuggestions, getUserProfileByLocation } from '@/lib/user-service';
 import { useToast } from '@/hooks/use-toast';
 
 function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
@@ -42,21 +40,21 @@ function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
               Start a post
             </Button>
           </div>
-          <div className="flex justify-around">
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" onClick={() => setIsCreatePostDialogOpen(true)}>
+          <div className="flex flex-wrap justify-around gap-1">
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50 flex-1 min-w-[100px]" onClick={() => setIsCreatePostDialogOpen(true)}>
               <ImageIcon className="mr-2 h-5 w-5 text-blue-500" /> Media
             </Button>
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
-              <Video className="mr-2 h-5 w-5 text-green-500" /> Video
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50 flex-1 min-w-[100px]" disabled>
+              <Video className="mr-2 h-5 w-5 text-green-500" /> Event {/* Changed from Video to Event for variety */}
             </Button>
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" asChild>
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50 flex-1 min-w-[100px]" asChild>
               <Link href="/jobs/post">
                 <Briefcase className="mr-2 h-5 w-5 text-purple-500" /> Job
               </Link>
             </Button>
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" asChild>
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50 flex-1 min-w-[100px]" asChild>
               <Link href="/articles/create">
-                <Edit3 className="mr-2 h-5 w-5 text-orange-500" /> Write article
+                <Edit3 className="mr-2 h-5 w-5 text-orange-500" /> Article
               </Link>
             </Button>
           </div>
@@ -107,7 +105,7 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
       if (part.match(urlRegex)) {
         return (
           <a 
-            key={`link-${index}-${post.id}`} 
+            key={`link-${post.id}-${index}`} 
             href={part} 
             target="_blank" 
             rel="noopener noreferrer" 
@@ -117,12 +115,13 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
           </a>
         );
       }
-      return <span key={`text-${index}-${post.id}`}>{part}</span>;
+      // Ensure unique key for text parts as well
+      return <span key={`text-${post.id}-${index}`}>{part}</span>;
     });
   };
   
   return (
-    <Card className="mb-4" key={post.id}>
+    <Card className="mb-4" key={post.id + '-post-card'}>
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
           <Link href={`/profile/${post.author.uid}`}>
@@ -141,7 +140,7 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-2">
-        <p className="text-sm mb-2 whitespace-pre-line">{renderContentWithLinks(post.content)}</p>
+        <div className="text-sm mb-2 whitespace-pre-line">{renderContentWithLinks(post.content)}</div>
         {post.imageUrl && (
           <div className="my-2 rounded-md overflow-hidden">
             <Image src={post.imageUrl} alt="Post image" width={600} height={400} className="w-full h-auto object-cover" data-ai-hint="social media post"/>
@@ -225,7 +224,17 @@ function PeopleMayKnowCard() {
       if (currentUser) {
         setIsLoadingSuggestions(true);
         try {
-          const fofSuggestions = await getFriendsOfFriendsSuggestions(currentUser.uid, 3);
+          // Try fetching friends of friends first
+          let fofSuggestions = await getFriendsOfFriendsSuggestions(currentUser.uid, 3);
+          
+          // If not enough FoF, or user has no connections, fetch by location
+          if (fofSuggestions.length < 3 && currentUser.location) {
+            const locationSuggestions = await getUserProfileByLocation(currentUser.location, currentUser.uid, 3 - fofSuggestions.length);
+            // Combine and remove duplicates (FoF might overlap with location if friends are nearby)
+            const combined = [...fofSuggestions, ...locationSuggestions];
+            const uniqueSuggestions = Array.from(new Map(combined.map(item => [item.uid, item])).values());
+            fofSuggestions = uniqueSuggestions.slice(0,3);
+          }
           setSuggestions(fofSuggestions);
         } catch (error) {
           console.error("Error fetching People You May Know:", error);
@@ -256,7 +265,7 @@ function PeopleMayKnowCard() {
           </div>
         ) : (
           suggestions.map(person => (
-            <div key={person.uid} className="flex items-center space-x-3">
+            <div key={person.uid + '-suggestion'} className="flex items-center space-x-3">
               <Link href={`/profile/${person.uid}`}>
                   <Avatar>
                   <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
@@ -301,18 +310,16 @@ export default function HomePage() {
     setIsLoadingPageData(true);
     try {
       // Fetch posts relevant to the current user, e.g., posts from connections or based on interests.
-      // For now, it fetches all posts for simplicity, but this should be refined.
+      const userAndConnectionsIds = [currentUser.uid, ...(currentUser.connections || [])];
       const allPostsData = await getPosts(); 
       
-      // Example: Filter posts to show only those from the current user or their connections
-      // This requires currentUser.connections to be populated and accurate.
-      // const userAndConnectionsIds = [currentUser.uid, ...(currentUser.connections || [])];
-      // const feedPosts = allPostsData.filter(post => userAndConnectionsIds.includes(post.authorId));
+      const feedPosts = allPostsData.filter(post => 
+        userAndConnectionsIds.includes(post.authorId) || post.authorId === currentUser.uid
+      );
 
-      // Sort by newest first (already done by getPosts in this implementation, but good to be explicit)
-      allPostsData.sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
+      feedPosts.sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
       
-      setPosts(allPostsData); // Replace with `feedPosts` if filtering is implemented
+      setPosts(feedPosts);
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
@@ -332,17 +339,23 @@ export default function HomePage() {
         setIsLoadingPageData(true); 
         await fetchFeedPosts(); 
         
-        const learningCoursesData = await getLearningCourses();
-        // For "Recommended Learning", filter based on user's skills or search history (mocked for now)
+        const learningCoursesData = await fetchLearningCourses();
         const userSkills = currentUser.skills?.map(skill => skill.name.toLowerCase()) || [];
-        let filteredCourses = learningCoursesData;
-        if (userSkills.length > 0) {
-            const matching = learningCoursesData.filter(course => 
-                course.keywords?.some(keyword => userSkills.includes(keyword.toLowerCase()))
+        
+        // Prioritize courses matching user skills
+        let filteredCourses = learningCoursesData.filter(course => 
+            course.keywords?.some(keyword => userSkills.includes(keyword.toLowerCase()))
+        );
+
+        // If not enough skill-based courses, fill with other courses
+        if (filteredCourses.length < 2) {
+            const otherCourses = learningCoursesData.filter(course => 
+                !filteredCourses.find(fc => fc.id === course.id) // Exclude already selected courses
             );
-            if (matching.length > 0) filteredCourses = matching;
+            filteredCourses = [...filteredCourses, ...otherCourses.slice(0, 2 - filteredCourses.length)];
         }
-        setRecommendedCourses(filteredCourses.slice(0,2)); // Show 2 courses
+        
+        setRecommendedCourses(filteredCourses.slice(0,2));
         
         setIsLoadingPageData(false); 
       }
@@ -373,12 +386,12 @@ export default function HomePage() {
 
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-      <aside className="md:col-span-1 space-y-4 sticky top-20">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+      <aside className="lg:col-span-1 space-y-4 lg:sticky top-20 order-1 lg:order-none">
         <ProfileSummaryCard />
       </aside>
 
-      <section className="md:col-span-2 space-y-4">
+      <section className="lg:col-span-2 space-y-4 order-2 lg:order-none">
         <CreatePostCard onPostCreated={handlePostCreated} />
         {isLoadingPageData && posts.length === 0 ? (
              <div className="flex justify-center items-center min-h-[calc(100vh-20rem)]">
@@ -389,11 +402,11 @@ export default function HomePage() {
               <PostCard key={post.id + '-homepage'} post={post} onPostUpdated={handlePostUpdated} />
             ))
         ) : (
-          !isLoadingPageData && <Card><CardContent className="p-6 text-center text-muted-foreground">No posts yet. Be the first to share something!</CardContent></Card>
+          !isLoadingPageData && <Card><CardContent className="p-6 text-center text-muted-foreground">No posts for your feed yet. Connect with more people or create a post!</CardContent></Card>
         )}
       </section>
 
-      <aside className="md:col-span-1 space-y-4 sticky top-20">
+      <aside className="lg:col-span-1 space-y-4 lg:sticky top-20 order-3 lg:order-none">
          <PeopleMayKnowCard />
          {isLoadingPageData && recommendedCourses.length === 0 ? (
             <Card><CardContent className="p-4 h-48 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></CardContent></Card>
@@ -415,7 +428,7 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
       </CardHeader>
       <CardContent className="space-y-3">
         {courses.map((course: LearningCourse) => ( 
-          <Link href={`/learning/${course.id}`} key={course.id} className="flex items-center space-x-3 group">
+          <Link href={`/learning/${course.id}`} key={course.id + '-learning'} className="flex items-center space-x-3 group">
             <Image src={course.thumbnailUrl} alt={course.title} width={80} height={45} className="rounded object-cover" data-ai-hint="course thumbnail"/>
             <div>
               <p className="font-semibold text-sm group-hover:text-primary group-hover:underline">{course.title}</p>
@@ -430,5 +443,3 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
     </Card>
   )
 }
-
-

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useMemo, useRef } from 'react'; 
@@ -9,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Message, UserProfile } from "@/types";
-import { Archive, Edit, Filter, Loader2, Paperclip, Phone, Search, Send, Smile, Video } from "lucide-react";
+import { Archive, Edit, Filter, Loader2, Paperclip, Phone, Search, Send, Smile, Video, ArrowLeft } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
 import { createMessage, getMessagesBetweenUsers } from '@/lib/message-service';
@@ -63,6 +62,8 @@ export default function MessagingClientContent() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [newMessageContent, setNewMessageContent] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [showChatAreaMobile, setShowChatAreaMobile] = useState(false);
+
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -98,18 +99,27 @@ export default function MessagingClientContent() {
           const profile = await getCachedUserProfile(uid);
           if (profile) convosProfiles.push(profile);
         }
+        // Sort conversations by most recent message (requires message fetching logic not yet implemented here)
+        // For now, just use the order of connections or sort alphabetically
+        convosProfiles.sort((a,b) => (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName));
         setConversations(convosProfiles);
 
         let targetUserId = chatWithUserId;
-         // If chatWithUserId is present, ensure they are a connection
-        if (targetUserId && !connectedUserUIDs.includes(targetUserId)) {
-            targetUserId = null; 
-            router.replace('/messaging'); // Remove invalid chatWith param
+        if (targetUserId) {
+            if (!connectedUserUIDs.includes(targetUserId)) {
+                targetUserId = null; 
+                router.replace('/messaging');
+            } else {
+                 setShowChatAreaMobile(true); // If a chat is specified in URL, show chat area on mobile
+            }
         }
         
-        if (!targetUserId && convosProfiles.length > 0) {
+        // If no target ID from URL, and on mobile, don't auto-select first chat.
+        // On desktop, auto-select first chat if one exists.
+        if (!targetUserId && convosProfiles.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) { // 768px is md breakpoint
             targetUserId = convosProfiles[0].uid; 
         }
+
 
         if (targetUserId) {
           const partner = await getCachedUserProfile(targetUserId);
@@ -132,11 +142,19 @@ export default function MessagingClientContent() {
       loadInitialData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, loadingAuth, chatWithUserId, router]);
+  }, [currentUser, loadingAuth, chatWithUserId, router]); // `router` is stable, adding for exhaustive-deps
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+  
+  // Handle initial chat partner selection for mobile based on URL
+  useEffect(() => {
+    if (chatWithUserId && typeof window !== 'undefined' && window.innerWidth < 768) {
+      setShowChatAreaMobile(true);
+    }
+  }, [chatWithUserId]);
+
 
   const handleSendMessage = async () => {
     if (!newMessageContent.trim() || !currentUser || !activeChatPartner) return;
@@ -161,19 +179,35 @@ export default function MessagingClientContent() {
     }
   };
 
+  const handleSelectConversation = (user: UserProfile) => {
+    router.push(`/messaging?chatWith=${user.uid}`, { scroll: false }); // Use router to update URL
+    setActiveChatPartner(user);
+    setShowChatAreaMobile(true); // Show chat area on mobile after selection
+  };
 
-  if (loadingAuth || (!currentUser && !loadingAuth && !isLoadingData)) { // Added !isLoadingData to prevent flash of loader if data is already loaded
+  const handleBackToList = () => {
+    setShowChatAreaMobile(false);
+    setActiveChatPartner(null);
+    router.push('/messaging', { scroll: false }); // Clear chatWith param
+  };
+
+
+  if (loadingAuth || (!currentUser && !loadingAuth && !isLoadingData)) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-10rem)] border rounded-lg">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
-  if (!currentUser) return null; // Should be handled by redirect above, but good failsafe
+  if (!currentUser) return null; 
 
   return (
-    <div className="flex h-[calc(100vh-10rem)] border rounded-lg overflow-hidden">
-      <aside className="w-1/3 border-r bg-muted/50">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-10rem)] border rounded-lg overflow-hidden">
+      {/* Conversation List - Hidden on mobile when chat area is shown */}
+      <aside className={cn(
+        "w-full md:w-1/3 border-b md:border-b-0 md:border-r bg-muted/50 flex flex-col",
+        showChatAreaMobile && activeChatPartner ? "hidden md:flex" : "flex" 
+      )}>
         <div className="p-4 border-b">
           <div className="flex justify-between items-center mb-2">
             <h2 className="text-xl font-semibold">Messaging</h2>
@@ -187,14 +221,22 @@ export default function MessagingClientContent() {
             <Input type="search" placeholder="Search messages" className="pl-8 bg-background" disabled/>
           </div>
         </div>
-        <ScrollArea className="h-[calc(100%-8rem)]">
-          {isLoadingData && conversations.length === 0 ? ( // Show loader only if conversations are empty and loading
+        <ScrollArea className="flex-grow h-[200px] md:h-auto"> {/* Flex-grow takes remaining space */}
+          {isLoadingData && conversations.length === 0 ? ( 
              <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto"/></div>
           ) : conversations.length === 0 ? (
-            <p className="p-4 text-center text-muted-foreground">No connections to message. Connect with people to start chatting.</p>
+            <p className="p-4 text-center text-muted-foreground">No connections to message.</p>
           )
           : conversations.map(user => (
-            <Link href={`/messaging?chatWith=${user.uid}`} key={user.uid} className={`block p-3 hover:bg-accent/50 border-b ${user.uid === activeChatPartner?.uid ? 'bg-accent/60' : ''}`}>
+            <button 
+              key={user.uid} 
+              onClick={() => handleSelectConversation(user)}
+              className={cn(
+                "w-full text-left block p-3 hover:bg-accent/50 border-b",
+                user.uid === activeChatPartner?.uid && !showChatAreaMobile ? 'bg-accent/60' : '', // Highlight active if list is shown
+                user.uid === activeChatPartner?.uid && showChatAreaMobile ? 'bg-accent/60 md:bg-accent/60' : '' // Persist highlight on desktop
+              )}
+            >
               <div className="flex items-center space-x-3">
                 <div className="relative">
                     <Avatar>
@@ -209,42 +251,50 @@ export default function MessagingClientContent() {
                 <div>
                   <h3 className="font-medium">{user.firstName} {user.lastName}</h3>
                   <p className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">
-                    Start a conversation...
+                    {/* Placeholder for last message preview */}
+                    {user.headline || "Start a conversation..."}
                   </p>
                 </div>
               </div>
-            </Link>
+            </button>
           ))}
         </ScrollArea>
       </aside>
 
-      <section className="flex-grow flex flex-col bg-background">
-        {isLoadingData && !activeChatPartner ? ( // Show loader if loading and no active chat partner
+      {/* Chat Area - Hidden on mobile when conversation list is shown */}
+      <section className={cn(
+        "flex-grow flex-col bg-background",
+        showChatAreaMobile && activeChatPartner ? "flex" : "hidden md:flex"
+      )}>
+        {isLoadingData && !activeChatPartner ? ( 
              <div className="flex-grow flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary"/></div>
         ) : activeChatPartner ? (
           <>
             <header className="p-4 border-b flex justify-between items-center">
-              <div className="flex items-center space-x-3">
-                 <div className="relative">
-                    <Avatar>
-                    <AvatarImage src={activeChatPartner.profilePictureUrl} alt={activeChatPartner.firstName} data-ai-hint="user avatar"/>
-                    <AvatarFallback>{activeChatPartner.firstName?.charAt(0)}{activeChatPartner.lastName?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <span className={cn(
-                        "absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-background",
-                        activeChatPartner.isActive ? "bg-green-500" : "bg-gray-400"
-                    )} />
+                <div className="flex items-center space-x-3">
+                    <Button variant="ghost" size="icon" className="md:hidden mr-2" onClick={handleBackToList}>
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                    <div className="relative">
+                        <Avatar>
+                        <AvatarImage src={activeChatPartner.profilePictureUrl} alt={activeChatPartner.firstName} data-ai-hint="user avatar"/>
+                        <AvatarFallback>{activeChatPartner.firstName?.charAt(0)}{activeChatPartner.lastName?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className={cn(
+                            "absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                            activeChatPartner.isActive ? "bg-green-500" : "bg-gray-400"
+                        )} />
+                    </div>
+                    <div>
+                    <h3 className="font-semibold">{activeChatPartner.firstName} {activeChatPartner.lastName}</h3>
+                    <div className="flex items-center text-xs text-muted-foreground">
+                        <p className="mr-2 truncate max-w-[150px] sm:max-w-xs">{activeChatPartner.headline}</p>
+                        <span className='hidden sm:inline'>•</span>
+                        <p className="ml-0 sm:ml-2">{activeChatPartner.isActive ? "Active now" : "Offline"}</p>
+                    </div>
+                    </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold">{activeChatPartner.firstName} {activeChatPartner.lastName}</h3>
-                  <div className="flex items-center text-xs text-muted-foreground">
-                    <p className="mr-2">{activeChatPartner.headline}</p>
-                    <span>•</span>
-                    <p className="ml-2">{activeChatPartner.isActive ? "Active now" : "Offline"}</p>
-                  </div>
-                </div>
-              </div>
-               <div className="flex space-x-2">
+               <div className="hidden sm:flex space-x-2">
                 <Button variant="ghost" size="icon" disabled><Phone className="h-5 w-5" /></Button>
                 <Button variant="ghost" size="icon" disabled><Video className="h-5 w-5" /></Button>
                 <Button variant="ghost" size="icon" disabled><Archive className="h-5 w-5" /></Button>
@@ -252,7 +302,7 @@ export default function MessagingClientContent() {
             </header>
             
             <ScrollArea className="flex-grow p-4 space-y-4">
-              {isLoadingData && messages.length === 0 ? ( // Show loader for messages only if empty and loading
+              {isLoadingData && messages.length === 0 ? ( 
                 <div className="flex justify-center items-center h-full">
                   <Loader2 className="h-8 w-8 animate-spin text-primary"/>
                 </div>
@@ -268,8 +318,8 @@ export default function MessagingClientContent() {
               <div ref={messagesEndRef} />
             </ScrollArea>
 
-            <footer className="p-4 border-t">
-              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-2">
+            <footer className="p-2 sm:p-4 border-t">
+              <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center space-x-1 sm:space-x-2">
                 <Input 
                     placeholder="Write a message..." 
                     className="flex-grow" 
@@ -277,19 +327,19 @@ export default function MessagingClientContent() {
                     onChange={(e) => setNewMessageContent(e.target.value)}
                     disabled={isSendingMessage}
                 />
-                <Button variant="ghost" size="icon" disabled><Smile className="h-5 w-5" /></Button>
-                <Button variant="ghost" size="icon" disabled><Paperclip className="h-5 w-5" /></Button>
-                <Button type="submit" disabled={isSendingMessage || !newMessageContent.trim()}>
-                    {isSendingMessage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="h-5 w-5 mr-2" />}
-                    Send
+                <Button variant="ghost" size="icon" className="hidden sm:inline-flex" disabled><Smile className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" className="hidden sm:inline-flex" disabled><Paperclip className="h-5 w-5" /></Button>
+                <Button type="submit" size="sm" disabled={isSendingMessage || !newMessageContent.trim()}>
+                    {isSendingMessage ? <Loader2 className="h-4 w-4 animate-spin sm:mr-2" /> : <Send className="h-4 w-4 sm:mr-2" />}
+                    <span className="hidden sm:inline">Send</span>
                 </Button>
               </form>
             </footer>
           </>
-        ) : (
-            <div className="flex-grow flex items-center justify-center">
+        ) : ( // This case: no active chat partner, and not loading the main content for this section (e.g. on mobile when list is shown)
+            <div className="flex-grow items-center justify-center hidden md:flex"> {/* Only show this placeholder on md+ if no chat selected */}
                 <p className="text-muted-foreground">
-                    {conversations.length > 0 ? "Select a connection to start messaging." : "Connect with people to start messaging."}
+                    {conversations.length > 0 ? "Select a conversation to start messaging." : "Connect with people to start messaging."}
                 </p>
             </div>
         )}
@@ -297,4 +347,3 @@ export default function MessagingClientContent() {
     </div>
   );
 }
-

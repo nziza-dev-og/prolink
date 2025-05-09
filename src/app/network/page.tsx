@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -56,8 +56,8 @@ function InvitationCard({ invitation, currentUserUid, onInvitationAction }: { in
 
   return (
     <Card className="flex flex-col sm:flex-row items-center justify-between p-4">
-      <div className="flex items-center space-x-3 mb-3 sm:mb-0">
-        <Avatar className="h-16 w-16">
+      <div className="flex items-center space-x-3 mb-3 sm:mb-0 text-center sm:text-left">
+        <Avatar className="h-12 w-12 sm:h-16 sm:w-16 mx-auto sm:mx-0">
           <AvatarImage src={invitation.profilePictureUrl} alt={invitation.firstName} data-ai-hint="user avatar"/>
           <AvatarFallback>{invitation.firstName?.charAt(0)}{invitation.lastName?.charAt(0)}</AvatarFallback>
         </Avatar>
@@ -68,11 +68,11 @@ function InvitationCard({ invitation, currentUserUid, onInvitationAction }: { in
           <p className="text-sm text-muted-foreground">{invitation.headline}</p>
         </div>
       </div>
-      <div className="flex space-x-2">
-        <Button variant="outline" size="sm" onClick={handleIgnore} disabled={isProcessing}>
+      <div className="flex space-x-2 mt-2 sm:mt-0 w-full sm:w-auto justify-center sm:justify-end">
+        <Button variant="outline" size="sm" onClick={handleIgnore} disabled={isProcessing} className="flex-1 sm:flex-none">
           {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Ignore"}
         </Button>
-        <Button size="sm" onClick={handleAccept} disabled={isProcessing}>
+        <Button size="sm" onClick={handleAccept} disabled={isProcessing} className="flex-1 sm:flex-none">
           {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Accept"}
         </Button>
       </div>
@@ -82,13 +82,13 @@ function InvitationCard({ invitation, currentUserUid, onInvitationAction }: { in
 
 function SuggestionCard({ user, currentUserUid }: { user: UserProfile, currentUserUid: string }) {
   const { toast } = useToast();
-  const [connectionState, setConnectionState] = useState<{ status: 'loading' | 'not_connected' | 'pending_sent' | 'pending_received' | 'connected' | 'error', invitationId?: string }>({ status: 'loading' });
+  const [connectionState, setConnectionState] = useState<{ status: 'loading' | 'not_connected' | 'pending_sent' | 'pending_received' | 'connected' | 'error' | 'unknown', invitationId?: string }>({ status: 'loading' });
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     async function fetchStatus() {
       if (!currentUserUid || !user.uid || currentUserUid === user.uid) {
-        setConnectionState({ status: 'unknown' }); // Cannot connect to self or invalid state
+        setConnectionState({ status: 'unknown' }); 
         return;
       }
       setIsProcessing(true);
@@ -116,16 +116,16 @@ function SuggestionCard({ user, currentUserUid }: { user: UserProfile, currentUs
         setConnectionState({ status: 'connected' });
       } else if (result === 'already_sent') {
          toast({ title: "Request Sent", description: "Connection request already pending." });
-        const updatedStatus = await getInvitationStatus(currentUserUid, user.uid); // Re-fetch to get invitationId
+        const updatedStatus = await getInvitationStatus(currentUserUid, user.uid); 
         setConnectionState(updatedStatus);
       } else if (result === 'already_received') {
         toast({ title: "Request Exists", description: "This user has already sent you a connection request. Check your invitations." });
-        const updatedStatus = await getInvitationStatus(currentUserUid, user.uid); // Re-fetch to get invitationId
+        const updatedStatus = await getInvitationStatus(currentUserUid, user.uid); 
         setConnectionState(updatedStatus);
-      } else if (result) { // result is invitationId
+      } else if (result) { 
         toast({ title: "Request Sent", description: "Connection request sent successfully!" });
         setConnectionState({ status: 'pending_sent', invitationId: result });
-      } else { // result is null, implies an issue not caught by specific return strings
+      } else { 
          toast({ title: "Error", description: "Could not send connection request.", variant: "destructive" });
          setConnectionState({ status: 'error' });
       }
@@ -142,7 +142,7 @@ function SuggestionCard({ user, currentUserUid }: { user: UserProfile, currentUs
     if (!connectionState.invitationId || !currentUserUid || !user.uid) return;
     setIsProcessing(true);
     try {
-        await cancelConnectionRequest(connectionState.invitationId, user.uid); // Pass toUserId to update their pending count
+        await cancelConnectionRequest(connectionState.invitationId, user.uid); 
         toast({ title: "Request Cancelled", description: "Connection request has been cancelled." });
         setConnectionState({ status: 'not_connected', invitationId: undefined });
     } catch (error) {
@@ -168,12 +168,25 @@ function SuggestionCard({ user, currentUserUid }: { user: UserProfile, currentUs
       buttonAction = handleConnect;
       break;
     case 'pending_sent':
-      buttonContent = <><X className="mr-2 h-4 w-4" /> Cancel</>; // Changed to Cancel
-      buttonAction = handleCancelRequest; // Action for cancel
+      buttonContent = <><X className="mr-2 h-4 w-4" /> Cancel</>; 
+      buttonAction = handleCancelRequest; 
       break;
     case 'pending_received':
-      buttonContent = "Accept from Invites"; // Guide user to invitations section
-      buttonDisabled = true;
+      buttonContent = "Accept Invite"; 
+      buttonAction = async () => { // Simplified: directly accept. Ideally, this guides to invitations list or opens a modal.
+        if (!connectionState.invitationId) return;
+        setIsProcessing(true);
+        try {
+          await acceptConnectionRequest(connectionState.invitationId, currentUserUid, user.uid);
+          toast({ title: "Connection Accepted", description: `You are now connected with ${user.firstName}.` });
+          setConnectionState({ status: 'connected' });
+        } catch (error) {
+          toast({ title: "Error", description: "Failed to accept connection.", variant: "destructive" });
+          setConnectionState({ status: 'pending_received' }); // Revert to previous state on error
+        } finally {
+          setIsProcessing(false);
+        }
+      };
       break;
     case 'connected':
       buttonContent = "Connected";
@@ -189,7 +202,7 @@ function SuggestionCard({ user, currentUserUid }: { user: UserProfile, currentUs
       buttonDisabled = true;
   }
 
-  if (currentUserUid === user.uid) return null; // Don't show card for self
+  if (currentUserUid === user.uid) return null; 
 
   return (
     <Card className="text-center">
@@ -216,6 +229,7 @@ function SuggestionCard({ user, currentUserUid }: { user: UserProfile, currentUs
 export default function NetworkPage() {
   const { currentUser, loadingAuth, refetchUserProfile } = useAuth();
   const router = useRouter();
+  const searchParamsHook = useSearchParams(); // Renamed to avoid conflict
   const { toast } = useToast();
   
   const [invitations, setInvitations] = useState<(UserProfile & {invitationId: string})[]>([]); 
@@ -223,7 +237,16 @@ export default function NetworkPage() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [displayedSuggestions, setDisplayedSuggestions] = useState<UserProfile[]>([]);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false); // Start as false, true when searching
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false); 
+
+  // Get initial search term from URL query params
+  useEffect(() => {
+    const initialSearch = searchParamsHook.get('search');
+    if (initialSearch) {
+      setSearchTerm(initialSearch);
+    }
+  }, [searchParamsHook]);
+
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -268,7 +291,7 @@ export default function NetworkPage() {
             setIsLoadingSuggestions(false);
         }
       } else {
-        setDisplayedSuggestions([]); // Clear suggestions if search term is empty
+        setDisplayedSuggestions([]); 
         setIsLoadingSuggestions(false);
       }
     }
@@ -277,7 +300,7 @@ export default function NetworkPage() {
         if (!loadingAuth && currentUser) {
             fetchAndSetSuggestions();
         }
-    }, 500); // Debounce search by 500ms
+    }, 300); 
 
     return () => clearTimeout(debounceTimer);
 
@@ -302,7 +325,7 @@ export default function NetworkPage() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-      <aside className="md:col-span-1 space-y-4 sticky top-20">
+      <aside className="md:col-span-1 space-y-4 md:sticky top-20 order-1 md:order-none">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Manage my network</CardTitle>
@@ -343,14 +366,14 @@ export default function NetworkPage() {
         </Card>
       </aside>
 
-      <section className="md:col-span-3 space-y-6">
+      <section className="md:col-span-3 space-y-6 order-2 md:order-none">
         <Card>
             <CardContent className="p-4">
             <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                     type="search" 
-                    placeholder="Search by name or email..." 
+                    placeholder="Search by name, email or headline..." 
                     className="pl-8" 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -364,11 +387,11 @@ export default function NetworkPage() {
         ): invitations.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row justify-between items-center">
-              <CardTitle className="text-lg">Invitations</CardTitle>
-              {invitations.length > 3 && <Button variant="ghost" size="sm" disabled>See all {invitations.length}</Button>}
+              <CardTitle className="text-lg">Invitations ({invitations.length})</CardTitle>
+              {/* {invitations.length > 3 && <Button variant="ghost" size="sm" disabled>See all {invitations.length}</Button>} */}
             </CardHeader>
             <CardContent className="space-y-4">
-              {invitations.slice(0,3).map(inviteWithId => ( 
+              {invitations.map(inviteWithId => ( 
                 <InvitationCard key={inviteWithId.invitationId} invitation={inviteWithId} currentUserUid={currentUser.uid} onInvitationAction={handleInvitationAction} />
               ))}
             </CardContent>
@@ -377,11 +400,11 @@ export default function NetworkPage() {
         
         {isLoadingSuggestions ? (
             <div className="flex justify-center items-center py-10"> <Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
-        ) : searchTerm && displayedSuggestions.length > 0 ? ( // Only show suggestions if there's a search term AND results
+        ) : searchTerm && displayedSuggestions.length > 0 ? ( 
             <div>
             <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-semibold">Search Results</h2>
-                {displayedSuggestions.length > 6 && <Button variant="ghost" size="sm" disabled>See all</Button>}
+                <h2 className="text-lg font-semibold">Search Results ({displayedSuggestions.length})</h2>
+                {/* {displayedSuggestions.length > 6 && <Button variant="ghost" size="sm" disabled>See all</Button>} */}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {displayedSuggestions.map(user => ( 
@@ -389,16 +412,16 @@ export default function NetworkPage() {
                 ))}
             </div>
             </div>
-        ) : searchTerm && !isLoadingSuggestions && displayedSuggestions.length === 0 ? ( // Show no results if search term and no results
+        ) : searchTerm && !isLoadingSuggestions && displayedSuggestions.length === 0 ? ( 
              <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">
                     No users found matching your search.
                 </CardContent>
             </Card>
-        ) : !searchTerm && !isLoadingSuggestions ? ( // Show prompt if no search term and not loading
+        ) : !searchTerm && !isLoadingSuggestions && invitations.length === 0 ? ( // Only show prompt if no search, no loading, and no invites
              <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">
-                   Search for people you know to connect with them.
+                   Search for people you know or check your invitations.
                 </CardContent>
             </Card>
         ) : null }
@@ -406,4 +429,3 @@ export default function NetworkPage() {
     </div>
   );
 }
-

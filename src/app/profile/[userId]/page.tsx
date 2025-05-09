@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -53,7 +52,7 @@ function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdate
       if (part.match(urlRegex)) {
         return (
           <a 
-            key={index} 
+            key={`link-${post.id}-${index}`} 
             href={part} 
             target="_blank" 
             rel="noopener noreferrer" 
@@ -63,12 +62,12 @@ function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdate
           </a>
         );
       }
-      return part;
+      return <span key={`text-${post.id}-${index}`}>{part}</span>;
     });
   };
 
   return (
-    <Card className="mb-4">
+    <Card className="mb-4" key={post.id + '-profile-post'}>
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
           <Link href={post.author.uid ? `/profile/${post.author.uid}` : '#'}>
@@ -87,7 +86,7 @@ function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdate
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-2">
-        <p className="text-sm mb-2 whitespace-pre-line">{renderContentWithLinks(post.content)}</p>
+        <div className="text-sm mb-2 whitespace-pre-line">{renderContentWithLinks(post.content)}</div>
         {post.imageUrl && (
           <div className="my-2 rounded-md overflow-hidden">
             <Image src={post.imageUrl} alt="Post image" width={600} height={400} className="w-full h-auto object-cover" data-ai-hint="social media post"/>
@@ -184,13 +183,13 @@ export default function UserProfilePage() {
             <Image src={profile.coverPhotoUrl} alt={`${profile.firstName}'s cover photo`} layout="fill" objectFit="cover" data-ai-hint="profile cover background"/>
           )}
         </div>
-        <CardContent className="p-6 relative">
-          <div className="flex flex-col sm:flex-row sm:items-end -mt-20 sm:-mt-24">
-            <Avatar className="h-32 w-32 sm:h-40 sm:w-40 border-4 border-card rounded-full bg-card">
+        <CardContent className="p-4 sm:p-6 relative">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6">
+            <Avatar className="h-32 w-32 sm:h-40 sm:w-40 border-4 border-card rounded-full bg-card -mt-16 sm:-mt-20 flex-shrink-0">
               <AvatarImage src={profile.profilePictureUrl} alt={profile.firstName} data-ai-hint="user avatar large"/>
               <AvatarFallback className="text-5xl">{profile.firstName?.charAt(0)}{profile.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
-            <div className="sm:ml-6 mt-4 sm:mt-0 flex-grow">
+            <div className="mt-4 sm:mt-0 flex-grow">
               <h1 className="text-2xl sm:text-3xl font-bold">{profile.firstName} {profile.lastName}</h1>
               <p className="text-md text-foreground">{profile.headline}</p>
               <p className="text-sm text-muted-foreground">{profile.location} </p>
@@ -198,20 +197,20 @@ export default function UserProfilePage() {
                 <Link href={`/network/connections/${profile.uid}`}>{profile.connectionsCount || 0} connections</Link>
               </p>
             </div>
-            <div className="mt-4 sm:mt-0 space-x-2 flex items-center">
+            <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               {isCurrentUserProfile ? (
                 <>
-                  <Button variant="outline" asChild> 
+                  <Button variant="outline" asChild className="w-full sm:w-auto"> 
                     <Link href="/settings">
                         <Edit className="mr-2 h-4 w-4" /> Edit profile
                     </Link>
                   </Button>
-                  <Button disabled>Add profile section</Button> 
+                  <Button disabled className="w-full sm:w-auto">Add profile section</Button> 
                 </>
               ) : (
                 <>
-                  <Button asChild><Link href={`/network?search=${profile.firstName}%20${profile.lastName}`}><UserPlus className="mr-2 h-4 w-4" /> Connect</Link></Button> 
-                  <Button variant="outline" asChild><Link href={`/messaging?chatWith=${profile.uid}`}><MessageSquare className="mr-2 h-4 w-4" /> Message</Link></Button> 
+                  <Button asChild className="w-full sm:w-auto"><Link href={`/network?search=${profile.firstName}%20${profile.lastName}`}><UserPlus className="mr-2 h-4 w-4" /> Connect</Link></Button> 
+                  <Button variant="outline" asChild className="w-full sm:w-auto"><Link href={`/messaging?chatWith=${profile.uid}`}><MessageSquare className="mr-2 h-4 w-4" /> Message</Link></Button> 
                 </>
               )}
             </div>
@@ -236,7 +235,7 @@ export default function UserProfilePage() {
         </CardHeader>
         <CardContent>
           {userPosts.length > 0 ? (
-            userPosts.map(post => <ProfilePostCard key={post.id} post={post} onPostUpdated={handlePostUpdated} />)
+            userPosts.map(post => <ProfilePostCard key={post.id + '-profile-activity'} post={post} onPostUpdated={handlePostUpdated} />)
           ) : (
             <p className="text-sm text-muted-foreground">{profile.firstName} hasn&apos;t posted recently.</p>
           )}
@@ -328,4 +327,3 @@ export default function UserProfilePage() {
     </div>
   );
 }
-
