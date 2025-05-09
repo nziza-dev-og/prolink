@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Added useEffect import
 import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -64,10 +64,13 @@ export default function PostJobPage() {
       const newJobData: Omit<Job, 'id' | 'postedDate'> = {
         ...data,
         authorId: currentUser.uid,
+        // companyLogoUrl can be undefined if not provided, or an empty string which is fine.
+        // Firestore will not save undefined fields.
+        companyLogoUrl: data.companyLogoUrl || undefined, 
       };
       const jobId = await createJob(newJobData);
       toast({ title: "Job Posted", description: "Your job listing is now live!" });
-      router.push(`/jobs/${jobId}`); // Redirect to the newly created job's page
+      router.push(`/jobs/${jobId}`); 
     } catch (error) {
       console.error("Error posting job:", error);
       toast({ title: "Error", description: "Failed to post job. Please try again.", variant: "destructive" });
@@ -146,6 +149,7 @@ export default function PostJobPage() {
             <div>
               <Label htmlFor="skillsRequired">Skills Required (comma-separated)</Label>
               <Input id="skillsRequired" placeholder="e.g., React, Node.js, SQL" {...form.register('skillsRequired')} disabled={isSubmitting} />
+               {/* The transform in Zod schema handles array conversion, so direct error message for skillsRequired (as string) is fine if needed */}
               {form.formState.errors.skillsRequired && <p className="text-sm text-destructive mt-1">{form.formState.errors.skillsRequired.message}</p>}
             </div>
 
