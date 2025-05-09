@@ -1,15 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { getTotalUsersCount } from '@/lib/user-service';
+import { getTotalPostsCount } from '@/lib/post-service';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [isAdminVerified, setIsAdminVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
+
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [totalPosts, setTotalPosts] = useState<number | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
+
+  const [newSecretCode, setNewSecretCode] = useState('');
+  const [isSavingSecret, setIsSavingSecret] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -20,17 +33,53 @@ export default function AdminDashboardPage() {
         router.push('/admin/login');
       }
     } else {
-      // Should not happen in client component, but as a fallback
       router.push('/admin/login');
     }
     setIsVerifying(false);
   }, [router]);
 
+  useEffect(() => {
+    async function fetchStats() {
+      if (isAdminVerified) {
+        setIsLoadingStats(true);
+        try {
+          const usersCount = await getTotalUsersCount();
+          const postsCount = await getTotalPostsCount();
+          setTotalUsers(usersCount);
+          setTotalPosts(postsCount);
+        } catch (error) {
+          console.error("Failed to fetch admin stats:", error);
+          toast({ title: "Error fetching stats", description: "Could not load site statistics.", variant: "destructive" });
+        } finally {
+          setIsLoadingStats(false);
+        }
+      }
+    }
+    fetchStats();
+  }, [isAdminVerified, toast]);
+
   const handleAdminLogout = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('isAdmin');
     }
-    router.push('/'); // Redirect to home or login page
+    router.push('/'); 
+  };
+
+  const handleSaveSecretCode = (event: FormEvent) => {
+    event.preventDefault();
+    if (!newSecretCode.trim()) {
+      toast({ title: "Invalid Code", description: "Secret code cannot be empty.", variant: "destructive" });
+      return;
+    }
+    setIsSavingSecret(true);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('adminSecret', newSecretCode);
+      toast({ title: "Secret Code Updated", description: "Admin secret code has been changed." });
+      setNewSecretCode(''); 
+    } else {
+      toast({ title: "Error", description: "Could not save secret code.", variant: "destructive" });
+    }
+    setIsSavingSecret(false);
   };
 
   if (isVerifying) {
@@ -42,8 +91,6 @@ export default function AdminDashboardPage() {
   }
 
   if (!isAdminVerified) {
-    // This case should ideally be handled by the redirect in useEffect,
-    // but it's a safeguard.
     return null; 
   }
 
@@ -55,45 +102,71 @@ export default function AdminDashboardPage() {
           <CardDescription>Welcome to the ProLink Admin Panel.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <p>This is the admin dashboard. You can manage users, content, and site settings from here.</p>
           
           <section>
-            <h3 className="text-xl font-semibold mb-2">Quick Stats (Placeholder)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Total Users</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">1,234</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Active Posts</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">5,678</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Reported Issues</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">12</p>
-                </CardContent>
-              </Card>
-            </div>
+            <h3 className="text-xl font-semibold mb-2">Site Statistics</h3>
+            {isLoadingStats ? (
+              <div className="flex justify-center items-center py-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Total Users</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold">{totalUsers ?? 'N/A'}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Total Posts</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold">{totalPosts ?? 'N/A'}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Reported Issues</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold">0</p> 
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </section>
 
           <section>
-            <h3 className="text-xl font-semibold mb-2">Management Tools (Placeholder)</h3>
+            <h3 className="text-xl font-semibold mb-2">Management Tools</h3>
             <div className="space-x-2">
               <Button variant="outline" disabled>Manage Users</Button>
               <Button variant="outline" disabled>Content Moderation</Button>
               <Button variant="outline" disabled>Site Settings</Button>
             </div>
+          </section>
+
+          <section>
+            <h3 className="text-xl font-semibold mb-3">Admin Settings</h3>
+            <form onSubmit={handleSaveSecretCode} className="space-y-4 max-w-sm">
+              <div>
+                <Label htmlFor="newSecretCode">Change Admin Secret Code</Label>
+                <Input
+                  id="newSecretCode"
+                  type="password"
+                  value={newSecretCode}
+                  onChange={(e) => setNewSecretCode(e.target.value)}
+                  placeholder="Enter new secret code"
+                  disabled={isSavingSecret}
+                />
+              </div>
+              <Button type="submit" disabled={isSavingSecret}>
+                {isSavingSecret && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save New Secret Code
+              </Button>
+            </form>
           </section>
 
           <Button variant="destructive" onClick={handleAdminLogout}>

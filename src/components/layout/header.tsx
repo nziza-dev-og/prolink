@@ -21,6 +21,8 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
+import { generateMockNotifications } from '@/lib/mock-data';
+import type { Notification } from '@/types';
 
 
 const navItems = [
@@ -37,19 +39,29 @@ export default function Header() {
   const { currentUser, loadingAuth } = useAuth();
   const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   useEffect(() => {
-    // Check localStorage for admin status on client side
     if (typeof window !== 'undefined') {
       const adminStatus = localStorage.getItem('isAdmin');
       setIsAdmin(adminStatus === 'true');
     }
-  }, [pathname]); // Re-check if path changes, e.g., after admin login
+  }, [pathname]); 
+
+  useEffect(() => {
+    if (currentUser) {
+      // Simulate fetching notifications and counting unread ones
+      const allNotifications = generateMockNotifications(currentUser.uid);
+      const unreadCount = allNotifications.filter(n => !n.isRead).length;
+      setUnreadNotificationsCount(unreadCount);
+    } else {
+      setUnreadNotificationsCount(0);
+    }
+  }, [currentUser, pathname]); // Re-check on pathname change as well, in case navigation clears notifications
 
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      // Clear admin status on sign out
       if (typeof window !== 'undefined') {
         localStorage.removeItem('isAdmin');
       }
@@ -75,6 +87,7 @@ export default function Header() {
                 type="search"
                 placeholder="Search"
                 className="pl-8 w-[200px] lg:w-[280px] h-9 rounded-md"
+                disabled // Search functionality not implemented globally yet
               />
             </div>
           )}
@@ -90,12 +103,17 @@ export default function Header() {
                   key={item.label}
                   href={item.href}
                   className={cn(
-                    "flex flex-col items-center p-1 text-xs text-muted-foreground hover:text-foreground transition-colors",
+                    "relative flex flex-col items-center p-1 text-xs text-muted-foreground hover:text-foreground transition-colors",
                     pathname === item.href && "text-foreground border-b-2 border-primary"
                   )}
                   aria-label={item.label}
                 >
                   <item.icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                  {item.href === '/notifications' && unreadNotificationsCount > 0 && (
+                    <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">
+                      {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                    </span>
+                  )}
                   <span className="hidden sm:block text-xs">{item.label}</span>
                 </Link>
               ))}

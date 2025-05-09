@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,19 +9,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
-const ADMIN_SECRET_CODE = 'linkedIn'; // Keep this secure in a real app (e.g., env variable)
+const DEFAULT_ADMIN_SECRET_CODE = 'linkedIn'; 
 
 export default function AdminLoginPage() {
   const [secretCode, setSecretCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  const [effectiveAdminSecret, setEffectiveAdminSecret] = useState(DEFAULT_ADMIN_SECRET_CODE);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const customAdminSecret = localStorage.getItem('adminSecret');
+      if (customAdminSecret) {
+        setEffectiveAdminSecret(customAdminSecret);
+      }
+    }
+  }, []);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     setIsLoading(true);
 
-    if (secretCode === ADMIN_SECRET_CODE) {
+    if (secretCode === effectiveAdminSecret) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('isAdmin', 'true');
       }

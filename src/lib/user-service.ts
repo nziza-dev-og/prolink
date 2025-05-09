@@ -1,7 +1,7 @@
 'use server';
 import type { UserProfile } from '@/types';
 import { db } from './firebase';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, Timestamp, collection, getDocs } from 'firebase/firestore';
 
 export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections'>): Promise<void> {
   const userRef = doc(db, 'users', userId);
@@ -37,13 +37,14 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       ...data,
       id: userSnap.id,
       uid: userSnap.id, 
-      connectionsCount: data.connectionsCount || 0, // Ensure connectionsCount has a default
-      connections: data.connections || [], // Ensure connections has a default
+      connectionsCount: data.connectionsCount || (data.connections?.length || 0),
+      connections: data.connections || [],
     };
 
+    // Convert Timestamps to ISO strings
     if (data.createdAt instanceof Timestamp) {
       profile.createdAt = data.createdAt.toDate().toISOString();
-    } else if (data.createdAt && typeof data.createdAt.toDate === 'function') { // Handle cases where it might be a Firestore-like object but not a direct Timestamp instance
+    } else if (data.createdAt && typeof data.createdAt.toDate === 'function') {
         profile.createdAt = data.createdAt.toDate().toISOString();
     } else if (data.createdAt) {
        profile.createdAt = String(data.createdAt);
@@ -70,11 +71,37 @@ export async function updateUserProfile(userId: string, data: Partial<Omit<UserP
   
   updateData.updatedAt = serverTimestamp();
 
-  // Ensure connectionsCount is updated if connections array is modified
   if (data.connections) {
     updateData.connectionsCount = data.connections.length;
   }
 
+  // Ensure profilePictureUrl is handled correctly: if an empty string is passed, it means remove the picture.
+  // Firestore doesn't store undefined fields. If `data.profilePictureUrl` is an empty string, 
+  // and you want to remove it, you might need to handle this specifically if your default image logic relies on undefined.
+  // For now, if it's '', it will be stored as ''. If it's undefined, it won't be updated.
+  if(data.profilePictureUrl === ''){
+     // If you want to revert to a default or remove, handle here.
+     // For this implementation, an empty string will be saved.
+     // If you want to truly remove it to use a default, you might set it to a specific "removed" value or delete the field.
+  }
+
 
   await updateDoc(userRef, updateData);
+}
+
+export async function getTotalUsersCount(): Promise<number> {
+  const usersCollectionRef = collection(db, 'users');
+  const querySnapshot = await getDocs(usersCollectionRef);
+  return querySnapshot.size;
+}
+
+export async function getAllUserProfiles(): Promise<UserProfile[]> {
+  const usersCollectionRef = collection(db, 'users');
+  const querySnapshot = await getDocs(query(usersCollectionRef, orderBy('createdAt', 'desc')));
+  
+  return Promise.all(querySnapshot.docs.map(async (docSnapshot) => {
+    // Re-use getUserProfile logic to ensure consistent data transformation, especially for dates
+    // This is slightly less performant than direct mapping but ensures consistency
+    return (await getUserProfile(docSnapshot.id)) as UserProfile; 
+  }));
 }

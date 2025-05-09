@@ -7,62 +7,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { mockUserProfiles } from "@/lib/mock-data";
+import { generateMockNotifications } from "@/lib/mock-data"; // Updated import
+import type { Notification } from "@/types"; // Updated import
 import { BellRing, Briefcase, Loader2, MessageSquare, Settings, UserCheck, Users } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 
-
-interface Notification {
-  id: string;
-  type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment";
-  user?: {
-    id: string; // This should be UID
-    name: string;
-    avatarUrl?: string;
-  };
-  content: string;
-  timestamp: Date;
-  isRead: boolean;
-  link?: string;
-}
-
-const generateMockNotifications = (): Notification[] => [
-  {
-    id: "n1",
-    type: "profile_view",
-    user: { id: mockUserProfiles[1].id, name: `${mockUserProfiles[1].firstName} ${mockUserProfiles[1].lastName}`, avatarUrl: mockUserProfiles[1].profilePictureUrl },
-    content: `${mockUserProfiles[1].firstName} ${mockUserProfiles[1].lastName} viewed your profile.`,
-    timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
-    isRead: false,
-    link: `/profile/${mockUserProfiles[1].id}`
-  },
-  {
-    id: "n2",
-    type: "post_like",
-    user: { id: mockUserProfiles[2].id, name: `${mockUserProfiles[2].firstName} ${mockUserProfiles[2].lastName}`, avatarUrl: mockUserProfiles[2].profilePictureUrl },
-    content: `${mockUserProfiles[2].firstName} ${mockUserProfiles[2].lastName} liked your post: "Excited to share..."`,
-    timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
-    isRead: true,
-    link: `/posts/p1` // Example post link
-  },
-  {
-    id: "n3",
-    type: "job_alert",
-    content: "New job alert: Software Engineer at Tech Innovations Inc.",
-    timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
-    isRead: false,
-    link: `/jobs/j-tech-innovations` // Example job link
-  },
-   {
-    id: "n4",
-    type: "connection_request",
-    user: { id: mockUserProfiles[2].id, name: `${mockUserProfiles[2].firstName} ${mockUserProfiles[2].lastName}`, avatarUrl: mockUserProfiles[2].profilePictureUrl },
-    content: `You have a new connection request from ${mockUserProfiles[2].firstName} ${mockUserProfiles[2].lastName}.`,
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-    isRead: true,
-    link: `/network`
-  },
-];
 
 function NotificationIcon({ type }: { type: Notification["type"] }) {
   switch (type) {
@@ -121,11 +70,10 @@ export default function NotificationsPage() {
   }, [currentUser, loadingAuth, router]);
 
   useEffect(() => {
-     if (currentUser) { // Only load if user is authenticated
+     if (currentUser) { 
         setIsLoadingNotifications(true);
-        // Simulate fetching notifications
         setTimeout(() => {
-            setNotifications(generateMockNotifications());
+            setNotifications(generateMockNotifications(currentUser.uid)); // Pass current user ID
             setIsLoadingNotifications(false);
         }, 500);
      }

@@ -1,8 +1,8 @@
 import type { Timestamp } from 'firebase/firestore';
 
 export interface UserProfile {
-  id: string; // This will typically be the Firebase UID
-  uid: string; // Firebase UID
+  id: string; 
+  uid: string; 
   firstName: string;
   lastName: string;
   email: string;
@@ -11,17 +11,18 @@ export interface UserProfile {
   coverPhotoUrl?: string;
   summary?: string;
   location?: string;
-  connectionsCount: number; // Made non-optional, should default to 0
-  connections?: string[]; // Array of connected user UIDs
+  connectionsCount: number; 
+  connections?: string[]; 
   workExperience?: WorkExperience[];
   education?: Education[];
   skills?: Skill[];
   recommendations?: Recommendation[];
-  createdAt: Timestamp | string; // Firestore Timestamp or ISO string
-  updatedAt?: Timestamp | string; // Optional: Firestore Timestamp or ISO string for last update
-  isActive?: boolean; // Added for user online status
-  pendingInvitationsCount?: number; // Keep if used in UI
-  pendingInvitations?: string[]; // Array of user UIDs who sent an invitation
+  createdAt: Timestamp | string; 
+  updatedAt?: Timestamp | string; 
+  lastLogin?: Timestamp | string; // Optional: Track last login
+  isActive?: boolean; 
+  pendingInvitationsCount?: number; 
+  pendingInvitations?: string[]; 
 }
 
 export interface WorkExperience {
@@ -29,8 +30,8 @@ export interface WorkExperience {
   title: string;
   companyName: string;
   location?: string;
-  startDate: string; // Could be Date object or string
-  endDate?: string; // Could be Date object or string, or "Present"
+  startDate: string; 
+  endDate?: string; 
   description?: string;
   companyLogoUrl?: string;
 }
@@ -53,10 +54,10 @@ export interface Skill {
 
 export interface Recommendation {
   id: string;
-  recommenderProfile: Pick<UserProfile, "id" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
-  relationship: string; // e.g., "Managed John directly at Google"
+  recommenderProfile: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
+  relationship: string; 
   text: string;
-  date: string; // Could be Date object or string
+  date: string; 
 }
 
 export interface Post {
@@ -65,14 +66,14 @@ export interface Post {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
-  createdAt: Timestamp | string; // Firestore Timestamp or ISO string
+  createdAt: Timestamp | string; 
   likesCount: number;
   commentsCount: number;
   repostsCount: number;
-  isLikedByCurrentUser?: boolean; // This will be determined client-side based on 'likes' array
-  likes: string[]; // Array of user UIDs who liked the post
+  isLikedByCurrentUser?: boolean; 
+  likes: string[]; 
   comments?: Comment[];
-  authorId: string; // Firebase UID of the author
+  authorId: string; 
 }
 
 export interface Comment {
@@ -80,7 +81,7 @@ export interface Comment {
   author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
   authorId: string;
   content: string;
-  createdAt: Timestamp | string; // Firestore Timestamp or ISO string
+  createdAt: Timestamp | string; 
   likesCount: number;
   isLikedByCurrentUser?: boolean;
 }
@@ -92,10 +93,10 @@ export interface Job {
   location: string;
   employmentType: "Full-time" | "Part-time" | "Contract" | "Internship";
   description: string;
-  postedDate: Timestamp | string; // Firestore Timestamp or ISO string
+  postedDate: Timestamp | string; 
   companyLogoUrl?: string;
   skillsRequired?: string[];
-  authorId: string; // Firebase UID of the user who posted the job
+  authorId: string; 
 }
 
 export interface Message {
@@ -103,7 +104,7 @@ export interface Message {
   senderId: string;
   receiverId: string;
   content: string;
-  timestamp: string; // ISO date string
+  timestamp: string; 
   isRead: boolean;
 }
 
@@ -112,7 +113,21 @@ export interface LearningCourse {
   title: string;
   instructor: string;
   thumbnailUrl: string;
-  duration: string; // e.g. "2h 30m"
+  duration: string; 
   category: string;
-  keywords?: string[]; // Added for matching user skills/interests
+  keywords?: string[]; 
+}
+
+export interface Notification {
+  id: string;
+  type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment";
+  user?: {
+    id: string; 
+    name: string;
+    avatarUrl?: string;
+  };
+  content: string;
+  timestamp: Date; // Keep as Date for easy formatting on client
+  isRead: boolean;
+  link?: string;
 }

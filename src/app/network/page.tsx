@@ -1,18 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockUserProfiles } from "@/lib/mock-data";
-import type { UserProfile } from "@/types";
-import { UserPlus, Users, Loader2, Contact } from "lucide-react"; // Added Contact
+import { mockUserProfiles, generateMockNotifications } from "@/lib/mock-data"; // Using mock profiles for now
+import type { UserProfile, Notification as NotificationType } from "@/types"; // Added NotificationType
+import { UserPlus, Users, Loader2, Contact, Search, CalendarIcon, UserRoundCog } from "lucide-react"; // Added Search, CalendarIcon, UserRoundCog
 import { useAuth } from '@/context/auth-context';
-
-// Mock data for invitations (incoming connection requests)
-const mockInvitationsData: UserProfile[] = mockUserProfiles.slice(3, 5).map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString(), headline: `Wants to connect with you. Common connections: ${Math.floor(Math.random()*10)}`, connectionsCount: p.connectionsCount || 0 }));
+import { getAllUserProfiles } from '@/lib/user-service';
 
 
 function InvitationCard({ user }: { user: UserProfile }) {
@@ -64,8 +63,12 @@ function SuggestionCard({ user }: { user: UserProfile }) {
 export default function NetworkPage() {
   const { currentUser, loadingAuth } = useAuth();
   const router = useRouter();
+  
+  const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
-  const [invitations, setInvitations] = useState<UserProfile[]>([]);
+  const [invitations, setInvitations] = useState<UserProfile[]>([]); // Using NotificationType for mock invitations
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -74,39 +77,77 @@ export default function NetworkPage() {
   }, [currentUser, loadingAuth, router]);
 
   useEffect(() => {
-    if (currentUser) {
-      // Filter invitations to exclude current user
-      const filteredInvitations = mockInvitationsData.filter(inv => inv.uid !== currentUser.uid);
-      setInvitations(filteredInvitations);
-
-      // Filter suggestions
-      const currentUserLocation = currentUser.location;
-      const currentUserConnections = currentUser.connections || [];
-      
-      const filteredSuggestions = mockUserProfiles.filter(p => 
-        p.uid !== currentUser.uid && // Not the current user
-        !currentUserConnections.includes(p.uid) && // Not already connected
-        !filteredInvitations.some(inv => inv.uid === p.uid) && // Not in pending invitations
-        (currentUserLocation ? p.location === currentUserLocation : true) // Same location or all if no location for current user
-      ).slice(0, 6); // Show up to 6 suggestions
-      setSuggestions(filteredSuggestions);
+    async function loadProfiles() {
+      setIsLoadingProfiles(true);
+      try {
+        // In a real app, fetch all users or a paginated list. For now, use mock or fetch all from Firebase.
+        // const profiles = await getAllUserProfiles(); // This might be too slow for many users
+        const profiles = mockUserProfiles; // Using mock for now for performance
+        setAllProfiles(profiles);
+      } catch (error) {
+        console.error("Error fetching profiles:", error);
+      } finally {
+        setIsLoadingProfiles(false);
+      }
     }
-  }, [currentUser]);
+    if (currentUser) {
+      loadProfiles();
+      // Mock invitations (these would come from a specific 'invitations' collection or notifications)
+      const mockInvites = generateMockNotifications(currentUser.uid)
+        .filter(n => n.type === 'connection_request' && n.user)
+        .map(n => allProfiles.find(p => p.uid === n.user!.id)!)
+        .filter(Boolean); // Filter out undefined if user not found in allProfiles
+      setInvitations(mockInvites as UserProfile[]);
+    }
+  }, [currentUser, allProfiles]); // Re-run if allProfiles changes (e.g. for mock data population of invites)
+
+  const filteredSuggestions = useMemo(() => {
+    if (!currentUser || allProfiles.length === 0) return [];
+
+    const currentUserConnections = currentUser.connections || [];
+    const invitationUIDs = invitations.map(inv => inv.uid);
+
+    if (searchTerm.trim() !== '') {
+      return allProfiles.filter(p =>
+        p.uid !== currentUser.uid &&
+        !currentUserConnections.includes(p.uid) &&
+        !invitationUIDs.includes(p.uid) &&
+        (
+          p.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          p.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (p.email && p.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (p.headline && p.headline.toLowerCase().includes(searchTerm.toLowerCase()))
+        )
+      ).slice(0, 10); // Limit search results
+    } else {
+      // Default suggestions: people from the same location, not connected, not invited
+      return allProfiles.filter(p =>
+        p.uid !== currentUser.uid &&
+        !currentUserConnections.includes(p.uid) &&
+        !invitationUIDs.includes(p.uid) &&
+        (currentUser.location ? p.location === currentUser.location : true)
+      ).slice(0, 6);
+    }
+  }, [currentUser, allProfiles, searchTerm, invitations]);
+
+  useEffect(() => {
+    setSuggestions(filteredSuggestions);
+  }, [filteredSuggestions]);
 
 
-  if (loadingAuth || !currentUser) {
+  if (loadingAuth || (!currentUser && !loadingAuth)) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
+  if (!currentUser) return null;
 
   const connectionsDisplayCount = currentUser.connections?.length ?? currentUser.connectionsCount ?? 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Left Panel: Manage Network */}
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
       <aside className="md:col-span-1 space-y-4 sticky top-20">
         <Card>
           <CardHeader>
@@ -121,57 +162,72 @@ export default function NetworkPage() {
             </Link>
              <Link href="#" className="flex items-center justify-between p-2 hover:bg-accent/50 rounded-md" aria-disabled="true" onClick={(e) => e.preventDefault()}>
               <div className="flex items-center text-sm">
-                <Contact className="mr-3 h-5 w-5 text-muted-foreground" /> {/* Replaced People Icon */}
-                 Contacts
+                <Contact className="mr-3 h-5 w-5 text-muted-foreground" /> Contacts
               </div>
-              <span className="text-sm text-muted-foreground">0</span> {/* Mock */}
+              <span className="text-sm text-muted-foreground">0</span> 
             </Link>
             <Link href="#" className="flex items-center justify-between p-2 hover:bg-accent/50 rounded-md" aria-disabled="true" onClick={(e) => e.preventDefault()}>
               <div className="flex items-center text-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-3 text-muted-foreground"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> {/* People Icon for Following */}
-                 People I Follow
+                 <UserRoundCog className="mr-3 h-5 w-5 text-muted-foreground" /> People I Follow
               </div>
-              <span className="text-sm text-muted-foreground">0</span> {/* Mock */}
+              <span className="text-sm text-muted-foreground">0</span> 
             </Link>
             <Link href="#" className="flex items-center justify-between p-2 hover:bg-accent/50 rounded-md" aria-disabled="true" onClick={(e) => e.preventDefault()}>
               <div className="flex items-center text-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-3 text-muted-foreground"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg> {/* Calendar Icon */}
-                 Events
+                <CalendarIcon className="mr-3 h-5 w-5 text-muted-foreground" /> Events
               </div>
-              <span className="text-sm text-muted-foreground">0</span> {/* Mock */}
+              <span className="text-sm text-muted-foreground">0</span> 
             </Link>
           </CardContent>
         </Card>
         <Card>
             <CardContent className="p-4 text-center">
                 <p className="text-sm mb-2">Add personal contacts</p>
-                <p className="text-xs text-muted-foreground mb-3">We’ll periodically import and store your contacts to help you and others connect. You choose who to connect to and who to invite. <Link href="#" className="text-primary">Learn more</Link></p>
+                <p className="text-xs text-muted-foreground mb-3">We’ll periodically import and store your contacts to help you and others connect. You choose who to connect to and who to invite. <Link href="#" className="text-primary hover:underline">Learn more</Link></p>
                 <Button variant="outline" className="w-full" disabled>Import contacts</Button>
             </CardContent>
         </Card>
       </aside>
 
-      {/* Right Panel: Invitations and Suggestions */}
-      <section className="md:col-span-2 space-y-6">
+      <section className="md:col-span-3 space-y-6">
+        <Card>
+            <CardContent className="p-4">
+            <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    type="search" 
+                    placeholder="Search by name, email or headline..." 
+                    className="pl-8" 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+            </CardContent>
+        </Card>
+
         {invitations.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row justify-between items-center">
               <CardTitle className="text-lg">Invitations</CardTitle>
-              <Button variant="ghost" size="sm" disabled>See all {invitations.length}</Button>
+              {invitations.length > 3 && <Button variant="ghost" size="sm" disabled>See all {invitations.length}</Button>}
             </CardHeader>
             <CardContent className="space-y-4">
-              {invitations.map(user => (
+              {invitations.slice(0,3).map(user => ( // Show max 3 invitations initially
                 <InvitationCard key={user.uid} user={user} />
               ))}
             </CardContent>
           </Card>
         )}
-
-        {suggestions.length > 0 && (
+        
+        {isLoadingProfiles && searchTerm === '' ? (
+            <div className="flex justify-center items-center py-10"> <Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
+        ) : suggestions.length > 0 ? (
             <div>
             <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-semibold">People you may know {currentUser.location ? `from ${currentUser.location}` : ''}</h2>
-                <Button variant="ghost" size="sm" disabled>See all</Button>
+                <h2 className="text-lg font-semibold">
+                    {searchTerm ? 'Search Results' : `People you may know ${currentUser.location ? `from ${currentUser.location}` : ''}`}
+                </h2>
+                {suggestions.length > 6 && !searchTerm && <Button variant="ghost" size="sm" disabled>See all</Button>}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {suggestions.map(user => ( 
@@ -179,15 +235,15 @@ export default function NetworkPage() {
                 ))}
             </div>
             </div>
-        )}
-         {suggestions.length === 0 && !loadingAuth && (
+        ) : (
              <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">
-                    No new suggestions right now.
+                    {searchTerm ? 'No users found matching your search.' : 'No new suggestions right now.'}
                 </CardContent>
             </Card>
-         )}
+        )}
       </section>
     </div>
   );
 }
+

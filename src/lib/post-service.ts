@@ -14,11 +14,10 @@ import {
   orderBy,
   Timestamp,
   where,
-  // getDoc, // No longer needed here as author profile fetched separately
   increment,
 } from 'firebase/firestore';
 import type { Post, Comment, UserProfile } from '@/types';
-import { getUserProfile } from './user-service'; // Import getUserProfile
+import { getUserProfile } from './user-service'; 
 
 export async function createPost(
   postData: Omit<Post, 'id' | 'createdAt' | 'likesCount' | 'commentsCount' | 'repostsCount' | 'likes' | 'comments'>
@@ -44,7 +43,7 @@ export async function getPosts(): Promise<Post[]> {
     querySnapshot.docs.map(async (docSnapshot) => {
       const data = docSnapshot.data();
       let authorInfo: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl"> = {
-        id: data.authorId,
+        id: data.authorId, // Use authorId from post data as fallback
         uid: data.authorId,
         firstName: 'Unknown',
         lastName: 'User',
@@ -56,7 +55,7 @@ export async function getPosts(): Promise<Post[]> {
         const authorProfile = await getUserProfile(data.authorId);
         if (authorProfile) {
           authorInfo = {
-            id: authorProfile.id,
+            id: authorProfile.uid, // Ensure 'id' in author object is the user's main ID (uid)
             uid: authorProfile.uid,
             firstName: authorProfile.firstName,
             lastName: authorProfile.lastName,
@@ -70,7 +69,11 @@ export async function getPosts(): Promise<Post[]> {
         ...data,
         id: docSnapshot.id,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
-        author: authorInfo,
+        author: authorInfo, // author is now correctly populated
+        likes: data.likes || [],
+        likesCount: data.likesCount || 0,
+        commentsCount: data.commentsCount || 0,
+        repostsCount: data.repostsCount || 0,
       } as Post;
     })
   );
@@ -82,13 +85,12 @@ export async function getPostsByAuthorId(authorId: string): Promise<Post[]> {
   const q = query(postsCollectionRef, where('authorId', '==', authorId), orderBy('createdAt', 'desc'));
   const querySnapshot = await getDocs(q);
 
-  // Fetch the author's profile once, as it's the same for all these posts
   const authorProfile = await getUserProfile(authorId);
   let authorInfo: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
 
   if (authorProfile) {
     authorInfo = {
-      id: authorProfile.id,
+      id: authorProfile.uid,
       uid: authorProfile.uid,
       firstName: authorProfile.firstName,
       lastName: authorProfile.lastName,
@@ -96,7 +98,7 @@ export async function getPostsByAuthorId(authorId: string): Promise<Post[]> {
       profilePictureUrl: authorProfile.profilePictureUrl,
     };
   } else {
-    authorInfo = { // Fallback if profile not found (should ideally not happen)
+    authorInfo = { 
       id: authorId,
       uid: authorId,
       firstName: 'Unknown',
@@ -112,7 +114,11 @@ export async function getPostsByAuthorId(authorId: string): Promise<Post[]> {
       ...data,
       id: docSnapshot.id,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
-      author: authorInfo, // Use the pre-fetched authorInfo
+      author: authorInfo,
+      likes: data.likes || [],
+      likesCount: data.likesCount || 0,
+      commentsCount: data.commentsCount || 0,
+      repostsCount: data.repostsCount || 0,
     } as Post;
   });
 }
@@ -174,7 +180,7 @@ export async function getComments(postId: string): Promise<Comment[]> {
         const authorProfile = await getUserProfile(data.authorId);
         if (authorProfile) {
           authorInfo = {
-            id: authorProfile.id,
+            id: authorProfile.uid,
             uid: authorProfile.uid,
             firstName: authorProfile.firstName,
             lastName: authorProfile.lastName,
@@ -193,4 +199,10 @@ export async function getComments(postId: string): Promise<Comment[]> {
     })
   );
   return commentsWithAuthors;
+}
+
+export async function getTotalPostsCount(): Promise<number> {
+  const postsCollectionRef = collection(db, 'posts');
+  const querySnapshot = await getDocs(postsCollectionRef);
+  return querySnapshot.size;
 }
