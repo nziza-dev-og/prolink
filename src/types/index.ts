@@ -1,8 +1,12 @@
+import type { Timestamp } from 'firebase/firestore';
+
 export interface UserProfile {
-  id: string;
+  id: string; // This will typically be the Firebase UID
+  uid: string; // Firebase UID
   firstName: string;
   lastName: string;
-  headline: string;
+  email: string;
+  headline?: string;
   profilePictureUrl?: string;
   coverPhotoUrl?: string;
   summary?: string;
@@ -12,6 +16,7 @@ export interface UserProfile {
   education?: Education[];
   skills?: Skill[];
   recommendations?: Recommendation[];
+  createdAt: Timestamp | string; // Firestore Timestamp or ISO string
 }
 
 export interface WorkExperience {
@@ -51,7 +56,7 @@ export interface Recommendation {
 
 export interface Post {
   id: string;
-  author: Pick<UserProfile, "id" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
+  author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
   content: string;
   imageUrl?: string;
   videoUrl?: string;
@@ -65,7 +70,7 @@ export interface Post {
 
 export interface Comment {
   id: string;
-  author: Pick<UserProfile, "id" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
+  author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
   content: string;
   createdAt: string; // ISO date string
   likesCount: number;

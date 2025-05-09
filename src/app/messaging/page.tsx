@@ -1,41 +1,49 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation'; // useSearchParams for query param
+import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { mockUserProfiles, getMessagesWithUser, getCurrentUser } from "@/lib/mock-data";
+import { mockUserProfiles, getMessagesWithUser as fetchMessagesWithUser } from "@/lib/mock-data"; // getCurrentUser removed
 import type { Message, UserProfile } from "@/types";
-import { Archive, Edit, Filter, Paperclip, Search, Send, Smile, Phone, Video } from "lucide-react";
-import Link from "next/link";
+import { Archive, Edit, Filter, Loader2, Paperclip, Phone, Search, Send, Smile, Video } from "lucide-react";
+import { useAuth } from '@/context/auth-context';
 
-// For now, let's assume we are chatting with Bob (mockUserProfiles[1])
-const CHATTING_WITH_USER_ID = '2';
+// For now, let's get active chat partner from query param or default
+// const DEFAULT_CHATTING_WITH_USER_ID = '2';
 
-async function ChatMessage({ message, isCurrentUser }: { message: Message, isCurrentUser: boolean }) {
-  const sender = mockUserProfiles.find(p => p.id === message.senderId);
+
+async function ChatMessage({ message, isCurrentUserSender, allUsers }: { message: Message, isCurrentUserSender: boolean, allUsers: UserProfile[] }) {
+  // The sender for this message. If it's the current user, their profile is in `currentUserFromAuth`.
+  // If not, find from `allUsers`.
+  const sender = allUsers.find(p => p.uid === message.senderId);
   if (!sender) return null;
 
+
   return (
-    <div className={`flex items-end space-x-2 mb-4 ${isCurrentUser ? 'justify-end' : ''}`}>
-      {!isCurrentUser && (
-        <Link href={`/profile/${sender.id}`}>
+    <div className={`flex items-end space-x-2 mb-4 ${isCurrentUserSender ? 'justify-end' : ''}`}>
+      {!isCurrentUserSender && (
+        <Link href={`/profile/${sender.uid}`}>
           <Avatar className="h-8 w-8">
             <AvatarImage src={sender.profilePictureUrl} alt={sender.firstName} data-ai-hint="user avatar small"/>
-            <AvatarFallback>{sender.firstName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{sender.firstName?.charAt(0)}</AvatarFallback>
           </Avatar>
         </Link>
       )}
-      <div className={`p-3 rounded-lg max-w-xs lg:max-w-md ${isCurrentUser ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none'}`}>
+      <div className={`p-3 rounded-lg max-w-xs lg:max-w-md ${isCurrentUserSender ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none'}`}>
         <p className="text-sm">{message.content}</p>
-        <p className={`text-xs mt-1 ${isCurrentUser ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+        <p className={`text-xs mt-1 ${isCurrentUserSender ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
       </div>
-      {isCurrentUser && (
-         <Link href={`/profile/${sender.id}`}>
-          <Avatar className="h-8 w-8">
+       {isCurrentUserSender && ( // Current user's avatar on the right
+         <Link href={`/profile/${sender.uid}`}>
+           <Avatar className="h-8 w-8">
             <AvatarImage src={sender.profilePictureUrl} alt={sender.firstName} data-ai-hint="user avatar small"/>
-            <AvatarFallback>{sender.firstName.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{sender.firstName?.charAt(0)}</AvatarFallback>
           </Avatar>
         </Link>
       )}
@@ -43,18 +51,69 @@ async function ChatMessage({ message, isCurrentUser }: { message: Message, isCur
   );
 }
 
-export default async function MessagingPage() {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) return <p>Loading...</p>; // Or redirect to login
+export default function MessagingPage() {
+  const { currentUser, loadingAuth } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const chatWithUserId = searchParams.get('chatWith');
 
-  const conversations = mockUserProfiles.filter(p => p.id !== currentUser.id); // Simplistic conversation list
-  const activeChatPartner = mockUserProfiles.find(p => p.id === CHATTING_WITH_USER_ID);
-  const messages = await getMessagesWithUser(CHATTING_WITH_USER_ID);
-
-  if (!activeChatPartner) {
-    return <p className="text-center py-10">Select a conversation to start messaging.</p>;
-  }
+  const [conversations, setConversations] = useState<UserProfile[]>([]);
+  const [activeChatPartner, setActiveChatPartner] = useState<UserProfile | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   
+  // All user profiles (mock for now, needed for avatars etc.)
+  const allMockProfiles = mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString()}));
+
+
+  useEffect(() => {
+    if (!loadingAuth && !currentUser) {
+      router.push('/login');
+    }
+  }, [currentUser, loadingAuth, router]);
+
+  useEffect(() => {
+    async function loadInitialData() {
+      if (currentUser) {
+        setIsLoadingData(true);
+        // Simplistic conversation list (all users except current user)
+        const convos = allMockProfiles.filter(p => p.uid !== currentUser.uid);
+        setConversations(convos);
+
+        const targetUserId = chatWithUserId || (convos.length > 0 ? convos[0].uid : null);
+
+        if (targetUserId) {
+          const partner = allMockProfiles.find(p => p.uid === targetUserId);
+          setActiveChatPartner(partner || null);
+          if (partner) {
+            const msgs = await fetchMessagesWithUser(partner.uid); // This mock fn uses 'id', adapt if needed
+            setMessages(msgs);
+          } else {
+            setMessages([]);
+          }
+        } else {
+            setActiveChatPartner(null);
+            setMessages([]);
+        }
+        setIsLoadingData(false);
+      }
+    }
+
+    if (!loadingAuth && currentUser) {
+      loadInitialData();
+    }
+  }, [currentUser, loadingAuth, chatWithUserId]);
+
+
+  if (loadingAuth || (!currentUser && !loadingAuth)) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (!currentUser) return null;
+
 
   return (
     <div className="flex h-[calc(100vh-10rem)] border rounded-lg overflow-hidden"> {/* Adjust height as needed */}
@@ -74,24 +133,22 @@ export default async function MessagingPage() {
           </div>
         </div>
         <ScrollArea className="h-[calc(100%-8rem)]"> {/* Adjust height */}
-          {conversations.map(user => (
-            <Link href={`/messaging?chatWith=${user.id}`} key={user.id} className={`block p-3 hover:bg-accent/50 border-b ${user.id === CHATTING_WITH_USER_ID ? 'bg-accent/60' : ''}`}>
+          {isLoadingData ? (
+             <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto"/></div>
+          ) : conversations.map(user => (
+            <Link href={`/messaging?chatWith=${user.uid}`} key={user.uid} className={`block p-3 hover:bg-accent/50 border-b ${user.uid === activeChatPartner?.uid ? 'bg-accent/60' : ''}`}>
               <div className="flex items-center space-x-3">
                 <Avatar>
                   <AvatarImage src={user.profilePictureUrl} alt={user.firstName} data-ai-hint="user avatar"/>
-                  <AvatarFallback>{user.firstName.charAt(0)}{user.lastName.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="font-medium">{user.firstName} {user.lastName}</h3>
-                  <p className="text-sm text-muted-foreground truncate">
+                  <p className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">
                     {/* Mock last message */}
-                    {messages.length > 0 && user.id === CHATTING_WITH_USER_ID ? messages[messages.length - 1].content : `Last message with ${user.firstName}...`}
+                    {messages.length > 0 && user.uid === activeChatPartner?.uid ? messages[messages.length - 1].content : `Start a conversation...`}
                   </p>
                 </div>
-                <span className="text-xs text-muted-foreground ml-auto">
-                  {/* Mock time */}
-                  {new Date(Date.now() - Math.random() * 100000000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
               </div>
             </Link>
           ))}
@@ -100,13 +157,15 @@ export default async function MessagingPage() {
 
       {/* Chat Area */}
       <section className="flex-grow flex flex-col bg-background">
-        {activeChatPartner && (
+        {isLoadingData && !activeChatPartner ? (
+             <div className="flex-grow flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary"/></div>
+        ) : activeChatPartner ? (
           <>
             <header className="p-4 border-b flex justify-between items-center">
               <div className="flex items-center space-x-3">
                 <Avatar>
                   <AvatarImage src={activeChatPartner.profilePictureUrl} alt={activeChatPartner.firstName} data-ai-hint="user avatar"/>
-                  <AvatarFallback>{activeChatPartner.firstName.charAt(0)}{activeChatPartner.lastName.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{activeChatPartner.firstName?.charAt(0)}{activeChatPartner.lastName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="font-semibold">{activeChatPartner.firstName} {activeChatPartner.lastName}</h3>
@@ -121,8 +180,10 @@ export default async function MessagingPage() {
             </header>
             
             <ScrollArea className="flex-grow p-4 space-y-4">
-              {messages.map(msg => (
-                <ChatMessage key={msg.id} message={msg} isCurrentUser={msg.senderId === currentUser.id} />
+              {isLoadingData ? (
+                <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
+              ) : messages.map(msg => (
+                <ChatMessage key={msg.id} message={msg} isCurrentUserSender={msg.senderId === currentUser.uid} allUsers={allMockProfiles} />
               ))}
             </ScrollArea>
 
@@ -135,8 +196,7 @@ export default async function MessagingPage() {
               </div>
             </footer>
           </>
-        )}
-        {!activeChatPartner && (
+        ) : (
             <div className="flex-grow flex items-center justify-center">
                 <p className="text-muted-foreground">Select a conversation to start messaging.</p>
             </div>

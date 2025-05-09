@@ -1,16 +1,22 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { mockUserProfiles } from "@/lib/mock-data";
-import { BellRing, Briefcase, MessageSquare, Settings, UserCheck, Users } from "lucide-react";
-import Link from "next/link";
+import { BellRing, Briefcase, Loader2, MessageSquare, Settings, UserCheck, Users } from "lucide-react";
+import { useAuth } from '@/context/auth-context';
+
 
 interface Notification {
   id: string;
   type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment";
   user?: {
-    id: string;
+    id: string; // This should be UID
     name: string;
     avatarUrl?: string;
   };
@@ -20,7 +26,7 @@ interface Notification {
   link?: string;
 }
 
-const mockNotifications: Notification[] = [
+const generateMockNotifications = (): Notification[] => [
   {
     id: "n1",
     type: "profile_view",
@@ -82,7 +88,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
       <div className="flex items-start space-x-3">
         {notification.user?.avatarUrl ? (
           <Avatar className="h-10 w-10">
-            <AvatarImage src={notification.user.avatarUrl} alt={notification.user.name} data-ai-hint="user avatar small" />
+            <AvatarImage src={notification.user.avatarUrl} alt={notification.user.name} data-ai-hint="user avatar small"/>
             <AvatarFallback>{notification.user.name.charAt(0)}</AvatarFallback>
           </Avatar>
         ) : (
@@ -103,6 +109,38 @@ function NotificationItem({ notification }: { notification: Notification }) {
 }
 
 export default function NotificationsPage() {
+  const { currentUser, loadingAuth } = useAuth();
+  const router = useRouter();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+
+  useEffect(() => {
+    if (!loadingAuth && !currentUser) {
+      router.push('/login');
+    }
+  }, [currentUser, loadingAuth, router]);
+
+  useEffect(() => {
+     if (currentUser) { // Only load if user is authenticated
+        setIsLoadingNotifications(true);
+        // Simulate fetching notifications
+        setTimeout(() => {
+            setNotifications(generateMockNotifications());
+            setIsLoadingNotifications(false);
+        }, 500);
+     }
+  }, [currentUser]);
+
+
+  if (loadingAuth || (!currentUser && !loadingAuth)) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (!currentUser) return null;
+
   return (
     <div className="max-w-2xl mx-auto">
       <Card>
@@ -113,15 +151,18 @@ export default function NotificationsPage() {
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-          {mockNotifications.length === 0 && (
+          {isLoadingNotifications ? (
+            <div className="p-6 text-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
+          ) : notifications.length === 0 ? (
             <p className="p-6 text-center text-muted-foreground">You have no new notifications.</p>
+          ) : (
+            notifications.map((notification, index) => (
+              <div key={notification.id}>
+                <NotificationItem notification={notification} />
+                {index < notifications.length - 1 && <Separator />}
+              </div>
+            ))
           )}
-          {mockNotifications.map((notification, index) => (
-            <div key={notification.id}>
-              <NotificationItem notification={notification} />
-              {index < mockNotifications.length - 1 && <Separator />}
-            </div>
-          ))}
         </CardContent>
       </Card>
     </div>

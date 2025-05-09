@@ -1,12 +1,18 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getJobs } from "@/lib/mock-data";
+import { getJobs as fetchJobs } from "@/lib/mock-data"; // Renamed to avoid conflict
 import type { Job } from "@/types";
-import { Bookmark, Briefcase, CheckCircle, ListFilter, MapPin, Search, Settings2, StickyNote } from "lucide-react";
-import Image from "next/image";
-import Link from "next/link";
+import { Bookmark, Briefcase, CheckCircle, ListFilter, Loader2, MapPin, Search, Settings2, StickyNote } from "lucide-react";
+import { useAuth } from '@/context/auth-context';
+
 
 function JobCard({ job }: { job: Job }) {
   return (
@@ -47,8 +53,40 @@ function JobCard({ job }: { job: Job }) {
   );
 }
 
-export default async function JobsPage() {
-  const jobs = await getJobs();
+export default function JobsPage() {
+  const { currentUser, loadingAuth } = useAuth();
+  const router = useRouter();
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoadingJobs, setIsLoadingJobs] = useState(true);
+
+  useEffect(() => {
+    if (!loadingAuth && !currentUser) {
+      router.push('/login');
+    }
+  }, [currentUser, loadingAuth, router]);
+
+  useEffect(() => {
+    async function loadJobs() {
+      if (currentUser) { // Only load if user is authenticated
+        setIsLoadingJobs(true);
+        const jobsData = await fetchJobs();
+        setJobs(jobsData);
+        setIsLoadingJobs(false);
+      }
+    }
+    if (!loadingAuth && currentUser) {
+        loadJobs();
+    }
+  }, [currentUser, loadingAuth]);
+
+  if (loadingAuth || (!currentUser && !loadingAuth)) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (!currentUser) return null;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
@@ -118,19 +156,25 @@ export default async function JobsPage() {
           </CardContent>
         </Card>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Recommended for you</h2>
-          <p className="text-sm text-muted-foreground mb-4">Based on your profile and search history</p>
-          <div className="space-y-4">
-            {jobs.map((job) => (
-              <JobCard key={job.id} job={job} />
-            ))}
+        {isLoadingJobs ? (
+            <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            </div>
+        ) : (
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Recommended for you</h2>
+            <p className="text-sm text-muted-foreground mb-4">Based on your profile and search history</p>
+            <div className="space-y-4">
+              {jobs.map((job) => (
+                <JobCard key={job.id} job={job} />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         
-        {jobs.length === 0 && <p className="text-center text-muted-foreground py-8">No jobs found matching your criteria.</p>}
+        {!isLoadingJobs && jobs.length === 0 && <p className="text-center text-muted-foreground py-8">No jobs found matching your criteria.</p>}
 
-        {jobs.length > 0 && (
+        {!isLoadingJobs && jobs.length > 0 && (
           <div className="text-center mt-8">
             <Button variant="outline">Load more jobs</Button>
           </div>

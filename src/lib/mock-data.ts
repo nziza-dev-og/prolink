@@ -1,10 +1,16 @@
 import type { UserProfile, Post, Job, LearningCourse, Message, WorkExperience, Education, Skill } from '@/types';
+import { Timestamp } from 'firebase/firestore'; // Import Timestamp
+
+// Helper to convert date strings to Timestamps for mock data where needed, or use ISO strings.
+// For simplicity, we'll use ISO strings for createdAt in mock UserProfile as well.
 
 export const mockUserProfiles: UserProfile[] = [
   {
     id: '1',
+    uid: '1', // Firebase UID
     firstName: 'Alice',
     lastName: 'Johnson',
+    email: 'alice@example.com',
     headline: 'Senior Software Engineer at TechCorp',
     profilePictureUrl: 'https://picsum.photos/seed/alice/200/200',
     coverPhotoUrl: 'https://picsum.photos/seed/alicecover/800/200',
@@ -26,13 +32,17 @@ export const mockUserProfiles: UserProfile[] = [
       { id: 's4', name: 'TypeScript', endorsements: 70 },
       { id: 's5', name: 'AWS', endorsements: 60 },
     ],
+    createdAt: new Date().toISOString(), // Example createdAt
   },
   {
     id: '2',
+    uid: '2',
     firstName: 'Bob',
     lastName: 'Smith',
+    email: 'bob@example.com',
     headline: 'Product Manager at NextGen Products',
     profilePictureUrl: 'https://picsum.photos/seed/bob/200/200',
+    coverPhotoUrl: 'https://picsum.photos/seed/bobcover/800/200',
     summary: 'Driving product strategy and execution for innovative SaaS solutions. Strong believer in user-centric design.',
     location: 'New York, NY',
     connectionsCount: 342,
@@ -46,23 +56,28 @@ export const mockUserProfiles: UserProfile[] = [
       { id: 's6', name: 'Product Management', endorsements: 90 },
       { id: 's7', name: 'Agile Methodologies', endorsements: 75 },
     ],
+    createdAt: new Date().toISOString(),
   },
   {
     id: '3',
+    uid: '3',
     firstName: 'Carol',
     lastName: 'Davis',
+    email: 'carol@example.com',
     headline: 'UX Designer at CreativeWorks Studio',
     profilePictureUrl: 'https://picsum.photos/seed/carol/200/200',
+    coverPhotoUrl: 'https://picsum.photos/seed/carolcover/800/200',
     summary: 'Creating intuitive and engaging user experiences. Proficient in Figma, Sketch, and Adobe XD.',
     location: 'Austin, TX',
     connectionsCount: 410,
+    createdAt: new Date().toISOString(),
   },
 ];
 
 export const mockPosts: Post[] = [
   {
     id: 'p1',
-    author: mockUserProfiles[0],
+    author: mockUserProfiles[0], // author should be Pick<UserProfile, ...>
     content: 'Excited to share that I just launched a new open-source project! Check it out on GitHub. #opensource #javascript #react',
     imageUrl: 'https://picsum.photos/seed/post1/600/400',
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
@@ -129,19 +144,26 @@ export const mockLearningCourses: LearningCourse[] = [
 ];
 
 export const mockMessages: Message[] = [
+    // Assuming senderId and receiverId are UIDs. '1' and '2' are used here for consistency with mockUserProfiles UIDs.
     { id: 'm1', senderId: '2', receiverId: '1', content: 'Hey Alice, great work on that project!', timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(), isRead: false },
     { id: 'm2', senderId: '1', receiverId: '2', content: 'Thanks Bob! Appreciate it.', timestamp: new Date(Date.now() - 8 * 60 * 1000).toISOString(), isRead: true },
 ];
 
-// Simulate API calls
+// Note: getProfileById and getCurrentUser will be effectively replaced by Firestore calls and AuthContext.
+// These mock functions can remain for other parts of the app that haven't migrated yet.
+
 export const getProfileById = async (userId: string): Promise<UserProfile | undefined> => {
+  console.warn("Using MOCK getProfileById. Should be replaced by Firestore call via getUserProfile.");
   await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
   return mockUserProfiles.find(profile => profile.id === userId);
 };
 
+// This function is largely superseded by useAuth() hook.
+// It's kept here for any legacy usage or for parts not yet refactored.
 export const getCurrentUser = async (): Promise<UserProfile | undefined> => {
+  console.warn("Using MOCK getCurrentUser. AuthContext should be preferred.");
   await new Promise(resolve => setTimeout(resolve, 300));
-  return mockUserProfiles[0]; // Assuming Alice is the current user
+  return mockUserProfiles[0]; // Assuming Alice is the current user from mock data
 }
 
 export const getFeedPosts = async (): Promise<Post[]> => {
@@ -161,5 +183,7 @@ export const getLearningCourses = async (): Promise<LearningCourse[]> => {
 
 export const getMessagesWithUser = async (userId: string): Promise<Message[]> => {
   await new Promise(resolve => setTimeout(resolve, 300));
-  return mockMessages.filter(m => (m.senderId === userId && m.receiverId === '1') || (m.senderId === '1' && m.receiverId === userId));
+  // Ensure current user is '1' for this mock logic to work, or adapt based on actual current user.
+  const currentMockUserId = '1'; 
+  return mockMessages.filter(m => (m.senderId === userId && m.receiverId === currentMockUserId) || (m.senderId === currentMockUserId && m.receiverId === userId));
 }

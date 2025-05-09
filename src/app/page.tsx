@@ -1,24 +1,32 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCurrentUser, getFeedPosts, getLearningCourses, mockUserProfiles } from "@/lib/mock-data";
+import { getFeedPosts, getLearningCourses, mockUserProfiles } from "@/lib/mock-data"; // getCurrentUser removed
 import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
-import { Briefcase, Edit3, Image as ImageIcon, Link2, MessageCircle, Repeat, Send, Share2, ThumbsUp, Users, Video } from "lucide-react";
-import Image from 'next/image';
-import Link from "next/link";
+import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
+import { useAuth } from '@/context/auth-context';
 
-async function CreatePostCard() {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) return null;
+// CreatePostCard now uses useAuth
+function CreatePostCard() {
+  const { currentUser, loadingAuth } = useAuth();
+
+  if (loadingAuth) return <Card className="mb-4 p-4 flex justify-center items-center h-32"><Loader2 className="h-8 w-8 animate-spin text-primary"/></Card>;
+  if (!currentUser) return null; // Or some prompt to log in/register
 
   return (
     <Card className="mb-4">
       <CardContent className="p-4">
         <div className="flex items-center space-x-3 mb-3">
-          <Link href={`/profile/${currentUser.id}`}>
+          <Link href={`/profile/${currentUser.uid}`}>
             <Avatar>
-              <AvatarImage src={currentUser.profilePictureUrl} alt={currentUser.firstName} data-ai-hint="user avatar" />
-              <AvatarFallback>{currentUser.firstName.charAt(0)}{currentUser.lastName.charAt(0)}</AvatarFallback>
+              <AvatarImage src={currentUser.profilePictureUrl} alt={currentUser.firstName || ''} data-ai-hint="user avatar" />
+              <AvatarFallback>{currentUser.firstName?.charAt(0)}{currentUser.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
           </Link>
           <Button variant="outline" className="flex-grow justify-start rounded-full text-muted-foreground">
@@ -63,7 +71,6 @@ function PostActions({ post }: { post: PostType }) {
   );
 }
 
-
 function PostCard({ post }: { post: PostType }) {
   return (
     <Card className="mb-4">
@@ -72,7 +79,7 @@ function PostCard({ post }: { post: PostType }) {
           <Link href={`/profile/${post.author.id}`}>
             <Avatar>
               <AvatarImage src={post.author.profilePictureUrl} alt={post.author.firstName} data-ai-hint="user avatar"/>
-              <AvatarFallback>{post.author.firstName.charAt(0)}{post.author.lastName.charAt(0)}</AvatarFallback>
+              <AvatarFallback>{post.author.firstName?.charAt(0)}{post.author.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
           </Link>
           <div>
@@ -104,8 +111,11 @@ function PostCard({ post }: { post: PostType }) {
   );
 }
 
-async function ProfileSummaryCard() {
-  const currentUser = await getCurrentUser();
+// ProfileSummaryCard now uses useAuth
+function ProfileSummaryCard() {
+  const { currentUser, loadingAuth } = useAuth();
+
+  if (loadingAuth) return <Card className="p-4 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary"/></Card>;
   if (!currentUser) return null;
 
   return (
@@ -114,13 +124,13 @@ async function ProfileSummaryCard() {
         {currentUser.coverPhotoUrl && <Image src={currentUser.coverPhotoUrl} alt="Cover photo" layout="fill" objectFit="cover" data-ai-hint="profile cover background"/>}
       </div>
       <CardContent className="p-4 text-center -mt-10">
-        <Link href={`/profile/${currentUser.id}`}>
+        <Link href={`/profile/${currentUser.uid}`}>
           <Avatar className="h-20 w-20 mx-auto border-4 border-card mb-2">
-            <AvatarImage src={currentUser.profilePictureUrl} alt={currentUser.firstName} data-ai-hint="user avatar" />
-            <AvatarFallback>{currentUser.firstName.charAt(0)}{currentUser.lastName.charAt(0)}</AvatarFallback>
+            <AvatarImage src={currentUser.profilePictureUrl} alt={currentUser.firstName || ''} data-ai-hint="user avatar"/>
+            <AvatarFallback>{currentUser.firstName?.charAt(0)}{currentUser.lastName?.charAt(0)}</AvatarFallback>
           </Avatar>
         </Link>
-        <Link href={`/profile/${currentUser.id}`} className="block font-semibold text-lg hover:underline">{currentUser.firstName} {currentUser.lastName}</Link>
+        <Link href={`/profile/${currentUser.uid}`} className="block font-semibold text-lg hover:underline">{currentUser.firstName} {currentUser.lastName}</Link>
         <p className="text-sm text-muted-foreground mb-3">{currentUser.headline}</p>
         <div className="border-t pt-3 space-y-1 text-sm">
           <Link href="/network" className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
@@ -134,8 +144,10 @@ async function ProfileSummaryCard() {
         </div>
       </CardContent>
       <CardFooter className="p-4 border-t">
-        <Button variant="outline" className="w-full">
-          <Users className="mr-2 h-4 w-4" /> My Network
+        <Button variant="outline" className="w-full" asChild>
+          <Link href="/network">
+            <Users className="mr-2 h-4 w-4" /> My Network
+          </Link>
         </Button>
       </CardFooter>
     </Card>
@@ -152,8 +164,8 @@ function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
         {people.slice(0, 3).map(person => (
           <div key={person.id} className="flex items-center space-x-3">
             <Avatar>
-              <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small" />
-              <AvatarFallback>{person.firstName.charAt(0)}{person.lastName.charAt(0)}</AvatarFallback>
+              <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
+              <AvatarFallback>{person.firstName?.charAt(0)}{person.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
             <div className="flex-grow">
               <Link href={`/profile/${person.id}`} className="font-semibold text-sm hover:underline">{person.firstName} {person.lastName}</Link>
@@ -172,8 +184,102 @@ function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
   );
 }
 
-async function LearningCoursesCard() {
-  const courses = await getLearningCourses();
+async function getLearningData() {
+  return getLearningCourses();
+}
+async function getFeedData() {
+  return getFeedPosts();
+}
+function getOtherUsersData() {
+   // Filter out current user for suggestions - this might need adjustment if currentUser is not '1'
+  return mockUserProfiles.filter(p => p.id !== '1');
+}
+
+
+export default function HomePage() {
+  const { currentUser, loadingAuth } = useAuth();
+  const router = useRouter();
+
+  const [posts, setPosts] = useState<PostType[]>([]);
+  const [learningCourses, setLearningCourses] = useState<LearningCourse[]>([]);
+  const [otherUsers, setOtherUsers] = useState<UserProfile[]>([]);
+  const [isLoadingPageData, setIsLoadingPageData] = useState(true);
+
+  useEffect(() => {
+    if (!loadingAuth && !currentUser) {
+      router.push('/login');
+    }
+  }, [currentUser, loadingAuth, router]);
+
+  useEffect(() => {
+    async function loadData() {
+      if (currentUser) { // Only load if user is authenticated
+        setIsLoadingPageData(true);
+        const [feedPostsData, learningCoursesData, otherUsersData] = await Promise.all([
+            getFeedData(),
+            getLearningData(),
+            getOtherUsersData()
+        ]);
+        setPosts(feedPostsData);
+        setLearningCourses(learningCoursesData);
+        setOtherUsers(otherUsersData.filter(u => u.uid !== currentUser.uid)); // Ensure current user isn't in suggestions
+        setIsLoadingPageData(false);
+      }
+    }
+    if (!loadingAuth && currentUser) {
+        loadData();
+    }
+  }, [currentUser, loadingAuth]);
+
+
+  if (loadingAuth || (!currentUser && !loadingAuth)) { // Show loader if auth is pending or if redirecting
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (!currentUser) return null; // Should be covered by redirect, but as a fallback
+
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+      {/* Left Sidebar */}
+      <aside className="md:col-span-1 space-y-4 sticky top-20">
+        <ProfileSummaryCard />
+      </aside>
+
+      {/* Main Content Feed */}
+      <section className="md:col-span-2 space-y-4">
+        <CreatePostCard />
+        {isLoadingPageData ? (
+             <div className="flex justify-center items-center min-h-[calc(100vh-20rem)]">
+                <Loader2 className="h-10 w-10 animate-spin text-primary"/>
+             </div>
+        ) : posts.map((post) => (
+          <PostCard key={post.id} post={post} />
+        ))}
+      </section>
+
+      {/* Right Sidebar */}
+      <aside className="md:col-span-1 space-y-4 sticky top-20">
+         {isLoadingPageData ? (
+            <Card><CardContent className="p-4 h-48 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></CardContent></Card>
+         ) : (
+            <PeopleMayKnowCard people={otherUsers} />
+         )}
+         {isLoadingPageData ? (
+            <Card><CardContent className="p-4 h-48 flex justify-center items-center"><Loader2 className="h-8 w-8 animate-spin text-primary"/></CardContent></Card>
+         ) : (
+            learningCourses.length > 0 && <LearningCoursesCard courses={learningCourses} />
+         )}
+      </aside>
+    </div>
+  );
+}
+
+function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
   if (!courses || courses.length === 0) return null;
 
   return (
@@ -184,7 +290,7 @@ async function LearningCoursesCard() {
       <CardContent className="space-y-3">
         {courses.slice(0,2).map((course: LearningCourse) => (
           <Link href={`/learning/${course.id}`} key={course.id} className="flex items-center space-x-3 group">
-            <Image src={course.thumbnailUrl} alt={course.title} width={80} height={45} className="rounded object-cover" data-ai-hint="course thumbnail" />
+            <Image src={course.thumbnailUrl} alt={course.title} width={80} height={45} className="rounded object-cover" data-ai-hint="course thumbnail"/>
             <div>
               <p className="font-semibold text-sm group-hover:text-primary group-hover:underline">{course.title}</p>
               <p className="text-xs text-muted-foreground">{course.instructor}</p>
@@ -199,33 +305,3 @@ async function LearningCoursesCard() {
   )
 }
 
-
-export default async function HomePage() {
-  const posts = await getFeedPosts();
-  const otherUsers = mockUserProfiles.filter(p => p.id !== '1'); // Filter out current user for suggestions
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-      {/* Left Sidebar */}
-      <aside className="md:col-span-1 space-y-4 sticky top-20">
-        <ProfileSummaryCard />
-        {/* Add more left sidebar cards here, e.g., recent activity, groups */}
-      </aside>
-
-      {/* Main Content Feed */}
-      <section className="md:col-span-2 space-y-4">
-        <CreatePostCard />
-        {posts.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
-      </section>
-
-      {/* Right Sidebar */}
-      <aside className="md:col-span-1 space-y-4 sticky top-20">
-         <PeopleMayKnowCard people={otherUsers} />
-         <LearningCoursesCard />
-        {/* Add more right sidebar cards here, e.g., trending news, ads */}
-      </aside>
-    </div>
-  );
-}
