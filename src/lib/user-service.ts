@@ -25,17 +25,17 @@ import {
   documentId, 
 } from 'firebase/firestore';
 
-export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections' | 'pendingInvitationsCount' | 'pendingInvitations' | 'suggestedConnections' | 'isActive'>): Promise<void> {
+export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections' | 'pendingInvitationsCount' | 'pendingInvitations' | 'suggestedConnections' | 'isActive' | 'lastLogin' | 'updatedAt'>): Promise<void> {
   const userRef = doc(db, 'users', userId);
   const defaultProfilePictureUrl = `https://picsum.photos/seed/${userId}/200/200`;
   const defaultCoverPhotoUrl = `https://picsum.photos/seed/${userId}cover/800/200`;
   
-  await setDoc(userRef, {
+  const profileData: Partial<UserProfile> = {
     ...data,
     uid: userId,
     id: userId, 
-    profilePictureUrl: data.profilePictureUrl || defaultProfilePictureUrl,
-    coverPhotoUrl: data.coverPhotoUrl || defaultCoverPhotoUrl,
+    profilePictureUrl: defaultProfilePictureUrl,
+    coverPhotoUrl: defaultCoverPhotoUrl,
     headline: data.headline || `${data.firstName} ${data.lastName} at ProLink`,
     summary: data.summary || '',
     location: data.location || '',
@@ -46,9 +46,13 @@ export async function createUserProfile(userId: string, data: Omit<UserProfile, 
     workExperience: data.workExperience || [],
     education: data.education || [],
     skills: data.skills || [],
-    isActive: false, // Default isActive to false
+    isActive: true, // Set to true on creation
     createdAt: serverTimestamp(),
-  });
+    updatedAt: serverTimestamp(),
+    lastLogin: serverTimestamp(),
+  };
+  
+  await setDoc(userRef, profileData);
 }
 
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
@@ -66,24 +70,19 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       connections: data.connections || [],
       pendingInvitationsCount: data.pendingInvitationsCount || (data.pendingInvitations?.length || 0),
       pendingInvitations: data.pendingInvitations || [],
-      isActive: data.isActive === undefined ? false : data.isActive, // Default isActive if not present
+      isActive: data.isActive === undefined ? false : data.isActive, 
     };
 
-    if (data.createdAt instanceof Timestamp) {
-      profile.createdAt = data.createdAt.toDate().toISOString();
-    } else if (data.createdAt && typeof data.createdAt.toDate === 'function') {
-        profile.createdAt = data.createdAt.toDate().toISOString();
-    } else if (data.createdAt) {
-       profile.createdAt = String(data.createdAt);
-    }
-
-    if (data.updatedAt instanceof Timestamp) {
-      profile.updatedAt = data.updatedAt.toDate().toISOString();
-    } else if (data.updatedAt && typeof data.updatedAt.toDate === 'function') {
-        profile.updatedAt = data.updatedAt.toDate().toISOString();
-    } else if (data.updatedAt) {
-      profile.updatedAt = String(data.updatedAt);
-    }
+    // Convert Timestamps to ISO strings for client components
+    ['createdAt', 'updatedAt', 'lastLogin'].forEach(field => {
+      if (data[field] instanceof Timestamp) {
+        profile[field] = data[field].toDate().toISOString();
+      } else if (data[field] && typeof data[field]?.toDate === 'function') { // For older SDK versions or direct Date objects
+        profile[field] = data[field].toDate().toISOString();
+      } else if (data[field]) { // If it's already a string or other primitive
+         profile[field] = String(data[field]);
+      }
+    });
     
     return profile as UserProfile;
   } else {
@@ -91,15 +90,35 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   }
 }
 
-export async function updateUserProfile(userId: string, data: Partial<Omit<UserProfile, 'id' | 'uid' | 'email' | 'createdAt' | 'suggestedConnections'>>): Promise<void> {
+export async function updateUserProfile(
+  userId: string,
+  data: Partial<Omit<UserProfile, 'id' | 'uid' | 'email' | 'createdAt' | 'suggestedConnections'>> & { lastLogin?: 'SERVER_TIMESTAMP' | Date | string | Timestamp }
+): Promise<void> {
   const userRef = doc(db, 'users', userId);
   // Create a mutable copy for updates
   const updateData: { [key: string]: any } = { ...data };
   
   updateData.updatedAt = serverTimestamp();
 
+  // Handle lastLogin specifically if a marker is passed
+  if (data.lastLogin === 'SERVER_TIMESTAMP') {
+    updateData.lastLogin = serverTimestamp();
+  } else if (data.lastLogin instanceof Date) {
+    updateData.lastLogin = Timestamp.fromDate(data.lastLogin);
+  } else if (typeof data.lastLogin === 'string' && data.lastLogin !== 'SERVER_TIMESTAMP') {
+    try {
+        const dateFromStr = new Date(data.lastLogin);
+        if (!isNaN(dateFromStr.getTime())) {
+             updateData.lastLogin = Timestamp.fromDate(dateFromStr);
+        }
+    } catch (e) {
+      // Silently fail if string is not a valid date
+    }
+  }
+
+
   if (data.hasOwnProperty('profilePictureUrl')) {
-    if (!data.profilePictureUrl) { // Handles empty string, null, undefined
+    if (!data.profilePictureUrl || data.profilePictureUrl.trim() === "") { 
       updateData.profilePictureUrl = `https://picsum.photos/seed/${userId}/200/200`; 
     } else {
       updateData.profilePictureUrl = data.profilePictureUrl;
@@ -107,7 +126,7 @@ export async function updateUserProfile(userId: string, data: Partial<Omit<UserP
   }
   
   if (data.hasOwnProperty('coverPhotoUrl')) {
-    if (!data.coverPhotoUrl) {
+    if (!data.coverPhotoUrl || data.coverPhotoUrl.trim() === "") {
         updateData.coverPhotoUrl = `https://picsum.photos/seed/${userId}cover/800/200`;
     } else {
         updateData.coverPhotoUrl = data.coverPhotoUrl;
@@ -119,6 +138,11 @@ export async function updateUserProfile(userId: string, data: Partial<Omit<UserP
   }
   if (data.pendingInvitations && Array.isArray(data.pendingInvitations)) {
     updateData.pendingInvitationsCount = data.pendingInvitations.length;
+  }
+  
+  // Ensure 'isActive' is explicitly handled to avoid accidental undefined
+  if (data.hasOwnProperty('isActive')) {
+    updateData.isActive = !!data.isActive; // Coerce to boolean
   }
   
   await updateDoc(userRef, updateData);
@@ -137,16 +161,11 @@ export async function getAllUserProfiles(): Promise<UserProfile[]> {
   return Promise.all(querySnapshot.docs.map(async (docSnapshot) => {
     const profile = await getUserProfile(docSnapshot.id);
     if (!profile) {
-        // This case should ideally not happen if docSnapshot.id is valid
-        // and getUserProfile handles errors gracefully or returns null.
-        // Throw an error or return a placeholder if necessary.
         console.error(`Profile not found for ID: ${docSnapshot.id}`);
-        // Depending on strictness, you might throw an error or filter out nulls later.
-        // For now, let's assume getUserProfile returns UserProfile or null.
         return null; 
     }
     return profile;
-  })).then(profiles => profiles.filter(p => p !== null) as UserProfile[]); // Filter out any nulls
+  })).then(profiles => profiles.filter(p => p !== null) as UserProfile[]); 
 }
 
 
@@ -158,8 +177,7 @@ export async function searchUserProfiles(searchTerm: string, currentUserId: stri
   const usersCollectionRef = collection(db, 'users');
   const profilesMap = new Map<string, UserProfile>();
 
-  // Search by first name (attempting a prefix search on original case and capitalized)
-  const searchTerms = [searchTerm, searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1), lowerSearchTerm];
+  const searchTerms = Array.from(new Set([searchTerm, searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1), lowerSearchTerm]));
 
   for (const term of searchTerms) {
     const firstNameQuery = query(
@@ -191,7 +209,6 @@ export async function searchUserProfiles(searchTerm: string, currentUserId: stri
     }
   }
   
-  // Search by email (exact match, assuming email stored as is or lowercase)
   const emailQuery = query(usersCollectionRef, where('email', '==', lowerSearchTerm), limit(10));
   const emailSnap = await getDocs(emailQuery);
   for (const docSnap of emailSnap.docs) {
@@ -212,17 +229,15 @@ export async function sendConnectionRequest(fromUserId: string, toUserId: string
   }
 
   const invitationsRef = collection(db, 'invitations');
-  // Check for pending or accepted invitation in either direction
   const existingInvitationQuery = query(
     invitationsRef,
     where('participantIds', 'array-contains-any', [fromUserId, toUserId])
-    // We will filter further client-side or by fetching both directions if participantIds isn't used
   );
   
   const existingInvitationSnap = await getDocs(existingInvitationQuery);
 
   for (const docSnap of existingInvitationSnap.docs) {
-    const inv = docSnap.data() as Invitation; // Assuming Invitation type is defined
+    const inv = docSnap.data() as Invitation; 
     if (
       ((inv.fromUserId === fromUserId && inv.toUserId === toUserId) || (inv.fromUserId === toUserId && inv.toUserId === fromUserId))
     ) {
@@ -238,7 +253,7 @@ export async function sendConnectionRequest(fromUserId: string, toUserId: string
   const newInvitation = {
     fromUserId,
     toUserId,
-    participantIds: [fromUserId, toUserId].sort(), // For easier querying if needed
+    participantIds: [fromUserId, toUserId].sort(), 
     status: 'pending' as const,
     createdAt: serverTimestamp(),
   };
@@ -266,7 +281,6 @@ export async function getInvitationStatus(
 
   const invitationsRef = collection(db, 'invitations');
 
-  // Check for invitation sent by current user to target user
   const sentQuery = query(
     invitationsRef,
     where('fromUserId', '==', currentUserId),
@@ -278,7 +292,6 @@ export async function getInvitationStatus(
     return { status: 'pending_sent', invitationId: sentSnap.docs[0].id };
   }
 
-  // Check for invitation received by current user from target user
   const receivedQuery = query(
     invitationsRef,
     where('fromUserId', '==', targetUserId),
@@ -290,18 +303,14 @@ export async function getInvitationStatus(
     return { status: 'pending_received', invitationId: receivedSnap.docs[0].id };
   }
   
-  // Check if already connected via an accepted invitation (double check against profile's connections array)
   const acceptedQuery = query(
     invitationsRef,
     where('participantIds', 'array-contains', currentUserId),
-    // Firestore does not support 'array-contains-all' with 'or' effectively for this structure.
-    // So we query for one participant and filter for the other.
   );
   const acceptedSnap = await getDocs(acceptedQuery);
   for (const docSnap of acceptedSnap.docs) {
     const inv = docSnap.data() as Invitation;
     if (inv.participantIds.includes(targetUserId) && inv.status === 'accepted') {
-      // Ensure both users are in connections arrays for consistency
       const targetUserProfile = await getUserProfile(targetUserId);
       if (currentUserProfile?.connections?.includes(targetUserId) && targetUserProfile?.connections?.includes(currentUserId)) {
           return { status: 'connected' };
@@ -338,12 +347,12 @@ export async function cancelConnectionRequest(invitationId: string, fromUserId: 
   const invitationRef = doc(db, 'invitations', invitationId);
   const invitationSnap = await getDoc(invitationRef);
 
-  if (invitationSnap.exists() && invitationSnap.data()?.status === 'pending') {
-    const targetUserRef = doc(db, 'users', toUserId); // User who received the request
+  if (invitationSnap.exists() && invitationSnap.data()?.status === 'pending' && invitationSnap.data()?.fromUserId === fromUserId) {
+    const targetUserRef = doc(db, 'users', toUserId); 
     await updateDoc(targetUserRef, {
       pendingInvitationsCount: increment(-1),
       pendingInvitations: arrayRemove(invitationId)
-    }).catch(err => console.error("Error updating target user on cancel:", err)); // Log error but proceed to delete
+    }).catch(err => console.error("Error updating target user on cancel:", err)); 
   }
   await deleteDoc(invitationRef);
 }
@@ -367,7 +376,7 @@ export async function getPendingInvitations(userId: string): Promise<(UserProfil
 
     const usersFromInvitations: (UserProfile & {invitationId: string})[] = [];
     for (const docSnap of querySnapshot.docs) {
-        const invitation = docSnap.data();
+        const invitation = docSnap.data() as Invitation; 
         const userProfile = await getUserProfile(invitation.fromUserId);
         if (userProfile) {
             usersFromInvitations.push({...userProfile, invitationId: docSnap.id});
@@ -387,14 +396,13 @@ export async function getFriendsOfFriendsSuggestions(currentUserId: string, resu
 
   const friendsOfFriendsUids = new Set<string>();
   
-  // Limit processing to a subset of connections to avoid excessive reads, e.g., first 10-20 connections.
-  const connectionsToProcess = currentUserProfile.connections.slice(0, 10); 
+  const connectionsToProcess = currentUserProfile.connections.slice(0, 20); 
 
   for (const friendId of connectionsToProcess) {
     const friendProfile = await getUserProfile(friendId);
     if (friendProfile && friendProfile.connections) {
       for (const friendOfFriendId of friendProfile.connections) {
-        if (!currentUserConnectionsSet.has(friendOfFriendId)) { // Not self or already a direct connection
+        if (!currentUserConnectionsSet.has(friendOfFriendId)) { 
           friendsOfFriendsUids.add(friendOfFriendId);
         }
       }
@@ -402,14 +410,15 @@ export async function getFriendsOfFriendsSuggestions(currentUserId: string, resu
   }
   
   const suggestedProfiles: UserProfile[] = [];
-  // Convert Set to Array to easily slice or limit.
   const fofArray = Array.from(friendsOfFriendsUids);
 
   for (let i = 0; i < fofArray.length && suggestedProfiles.length < resultLimit; i++) {
     const uid = fofArray[i];
+    // Avoid fetching profile if already processed or suggested
+    if (suggestedProfiles.find(p => p.uid === uid)) continue;
+
     const profile = await getUserProfile(uid);
     if (profile) {
-      // Ensure this person hasn't already sent/received a pending invite to/from current user
       const invitationStatus = await getInvitationStatus(currentUserId, profile.uid);
       if (invitationStatus.status === 'not_connected') {
           suggestedProfiles.push(profile);
@@ -428,8 +437,8 @@ export async function getUserProfileByLocation(location: string, currentUserId: 
   const q = query(
     usersCollectionRef, 
     where('location', '==', location), 
-    orderBy(documentId()), // Add a default orderBy if not specific to avoid warnings with limit
-    limit(resultLimit + 5) // Fetch a bit more to filter out current user and already connected users
+    orderBy(documentId()), 
+    limit(resultLimit + 10) // Fetch more to account for filtering current user and connections
   );
 
   const querySnapshot = await getDocs(q);
@@ -443,7 +452,6 @@ export async function getUserProfileByLocation(location: string, currentUserId: 
     }
     const profileData = await getUserProfile(docSnap.id); 
     if (profileData) {
-       // Further check: ensure this person hasn't already sent/received a pending invite to/from current user
       const invitationStatus = await getInvitationStatus(currentUserId, profileData.uid);
       if (invitationStatus.status === 'not_connected') {
         profiles.push(profileData);
@@ -456,5 +464,20 @@ export async function getUserProfileByLocation(location: string, currentUserId: 
   return profiles;
 }
 
+export async function getUserProfilesByLocation(location: string, currentUserId: string, resultLimit: number): Promise<UserProfile[]> {
+  // This is an alias for getUserProfileByLocation as requested by an earlier prompt.
+  // Keeping it to avoid breaking imports if it was referenced.
+  return getUserProfileByLocation(location, currentUserId, resultLimit);
+}
 
+
+interface Invitation { 
+    id: string;
+    fromUserId: string;
+    toUserId: string;
+    participantIds: string[];
+    status: 'pending' | 'accepted' | 'ignored' | 'cancelled';
+    createdAt: Timestamp | string;
+    updatedAt?: Timestamp | string;
+}
     
