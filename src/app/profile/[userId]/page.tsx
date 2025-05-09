@@ -12,7 +12,7 @@ import { getPostsByAuthorId } from "@/lib/post-service";
 import type { UserProfile, WorkExperience, Education, Skill, Post as PostType } from "@/types";
 import { Building, Edit, GraduationCap, Loader2, MessageSquare, Plus, Star, UserPlus } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
-import PostActions from '@/components/posts/post-actions'; // Import PostActions
+import PostActions from '@/components/posts/post-actions'; 
 
 function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (updatedPost: PostType) => void }) {
    const handleLikeUnlike = (postId: string, newLikes: string[], newLikesCount: number) => {
@@ -21,20 +21,33 @@ function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdate
     }
   };
 
+  if (!post.author) {
+    console.warn(`ProfilePostCard: post.author is undefined for post ID: ${post.id}. Post data:`, JSON.stringify(post));
+    return (
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <p className="text-sm text-destructive">Error: Author information is missing for this post.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="mb-4">
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
-          <Link href={`/profile/${post.author.uid}`}>
+          <Link href={post.author.uid ? `/profile/${post.author.uid}` : '#'}>
             <Avatar>
-              <AvatarImage src={post.author.profilePictureUrl} alt={post.author.firstName} data-ai-hint="user avatar"/>
+              <AvatarImage src={post.author.profilePictureUrl} alt={post.author.firstName || 'User'} data-ai-hint="user avatar"/>
               <AvatarFallback>{post.author.firstName?.charAt(0)}{post.author.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
           </Link>
           <div>
-            <Link href={`/profile/${post.author.uid}`} className="font-semibold hover:underline">{post.author.firstName} {post.author.lastName}</Link>
-            <p className="text-xs text-muted-foreground">{post.author.headline}</p>
-            <p className="text-xs text-muted-foreground">{new Date(post.createdAt as string).toLocaleDateString()}</p>
+            <Link href={post.author.uid ? `/profile/${post.author.uid}` : '#'} className="font-semibold hover:underline">
+               {post.author.firstName || 'Unknown'} {post.author.lastName || 'Author'}
+            </Link>
+            <p className="text-xs text-muted-foreground">{post.author.headline || 'No headline'}</p>
+            <p className="text-xs text-muted-foreground">{post.createdAt ? new Date(post.createdAt as string).toLocaleDateString() : 'Date unknown'}</p>
           </div>
         </div>
       </CardHeader>

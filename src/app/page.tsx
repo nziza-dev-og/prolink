@@ -69,20 +69,33 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
     }
   };
   
+  if (!post.author) {
+    console.warn(`PostCard: post.author is undefined for post ID: ${post.id}. Post data:`, JSON.stringify(post));
+    return (
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <p className="text-sm text-destructive">Error: Author information is missing for this post.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   return (
     <Card className="mb-4">
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
-          <Link href={`/profile/${post.author.uid}`}>
+          <Link href={post.author.uid ? `/profile/${post.author.uid}` : '#'}>
             <Avatar>
-              <AvatarImage src={post.author.profilePictureUrl} alt={post.author.firstName} data-ai-hint="user avatar"/>
+              <AvatarImage src={post.author.profilePictureUrl} alt={post.author.firstName || 'User'} data-ai-hint="user avatar"/>
               <AvatarFallback>{post.author.firstName?.charAt(0)}{post.author.lastName?.charAt(0)}</AvatarFallback>
             </Avatar>
           </Link>
           <div>
-            <Link href={`/profile/${post.author.uid}`} className="font-semibold hover:underline">{post.author.firstName} {post.author.lastName}</Link>
-            <p className="text-xs text-muted-foreground">{post.author.headline}</p>
-            <p className="text-xs text-muted-foreground">{new Date(post.createdAt as string).toLocaleDateString()}</p>
+            <Link href={post.author.uid ? `/profile/${post.author.uid}` : '#'} className="font-semibold hover:underline">
+              {post.author.firstName || 'Unknown'} {post.author.lastName || 'Author'}
+            </Link>
+            <p className="text-xs text-muted-foreground">{post.author.headline || 'No headline'}</p>
+            <p className="text-xs text-muted-foreground">{post.createdAt ? new Date(post.createdAt as string).toLocaleDateString() : 'Date unknown'}</p>
           </div>
         </div>
       </CardHeader>
@@ -96,9 +109,9 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
       </CardContent>
       <CardFooter className="px-4 pb-2 pt-0">
         <div className="flex justify-between w-full text-xs text-muted-foreground">
-          <span>{post.likesCount} Likes</span>
-          <span>{post.commentsCount} Comments</span>
-          <span>{post.repostsCount} Reposts</span>
+          <span>{post.likesCount || 0} Likes</span>
+          <span>{post.commentsCount || 0} Comments</span>
+          <span>{post.repostsCount || 0} Reposts</span>
         </div>
       </CardFooter>
       <div className="px-4 pb-3">
@@ -154,7 +167,6 @@ function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
   const { currentUser } = useAuth();
   if (!currentUser) return null;
 
-  // Ensure `person.id` is used for key, which should be unique in mockUserProfiles
   const suggestions = people.filter(p => p.uid !== currentUser.uid).slice(0,3);
 
   if (suggestions.length === 0) return null;
@@ -166,7 +178,7 @@ function PeopleMayKnowCard({ people }: { people: UserProfile[] }) {
       </CardHeader>
       <CardContent className="space-y-3">
         {suggestions.map(person => (
-          <div key={person.id || person.uid} className="flex items-center space-x-3"> {/* Use person.id or fallback to uid for key */}
+          <div key={person.uid} className="flex items-center space-x-3">
             <Avatar>
               <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
               <AvatarFallback>{person.firstName?.charAt(0)}{person.lastName?.charAt(0)}</AvatarFallback>
