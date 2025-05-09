@@ -20,9 +20,10 @@ import {
   arrayRemove,
   writeBatch,
   deleteDoc,
+  limit,
 } from 'firebase/firestore';
 
-export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections' | 'pendingInvitationsCount' | 'pendingInvitations'>): Promise<void> {
+export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections' | 'pendingInvitationsCount' | 'pendingInvitations' | 'suggestedConnections'>): Promise<void> {
   const userRef = doc(db, 'users', userId);
   const defaultProfilePictureUrl = `https://picsum.photos/seed/${userId}/200/200`;
   const defaultCoverPhotoUrl = `https://picsum.photos/seed/${userId}cover/800/200`;
@@ -86,7 +87,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   }
 }
 
-export async function updateUserProfile(userId: string, data: Partial<Omit<UserProfile, 'id' | 'uid' | 'email' | 'createdAt'>>): Promise<void> {
+export async function updateUserProfile(userId: string, data: Partial<Omit<UserProfile, 'id' | 'uid' | 'email' | 'createdAt' | 'suggestedConnections'>>): Promise<void> {
   const userRef = doc(db, 'users', userId);
   // Create a mutable copy for updates
   const updateData: { [key: string]: any } = { ...data };
@@ -383,4 +384,45 @@ export async function getPendingInvitations(userId: string): Promise<(UserProfil
     return usersFromInvitations;
 }
 
+// Fetches "friends of friends" suggestions for a user.
+export async function getFriendsOfFriendsSuggestions(currentUserId: string, resultLimit: number = 5): Promise<UserProfile[]> {
+  const currentUserProfile = await getUserProfile(currentUserId);
+  if (!currentUserProfile || !currentUserProfile.connections || currentUserProfile.connections.length === 0) {
+    return [];
+  }
 
+  const currentUserConnectionsSet = new Set(currentUserProfile.connections);
+  currentUserConnectionsSet.add(currentUserId); // Add current user to avoid suggesting self
+
+  const friendsOfFriendsUids = new Set<string>();
+
+  // Limit the number of first-degree connections to process to avoid excessive reads
+  const connectionsToProcess = currentUserProfile.connections.slice(0, 10); 
+
+  for (const friendId of connectionsToProcess) {
+    const friendProfile = await getUserProfile(friendId);
+    if (friendProfile && friendProfile.connections) {
+      for (const friendOfFriendId of friendProfile.connections) {
+        if (!currentUserConnectionsSet.has(friendOfFriendId)) {
+          friendsOfFriendsUids.add(friendOfFriendId);
+        }
+      }
+    }
+  }
+  
+  // Fetch profiles for the suggested UIDs, up to the limit
+  const suggestedProfiles: UserProfile[] = [];
+  for (const uid of Array.from(friendsOfFriendsUids)) {
+    if (suggestedProfiles.length >= resultLimit) break;
+    const profile = await getUserProfile(uid);
+    if (profile) {
+      // Final check to ensure this user is not already connected or has a pending invite with currentUser
+      const invitationStatus = await getInvitationStatus(currentUserId, profile.uid);
+      if (invitationStatus.status === 'not_connected') {
+        suggestedProfiles.push(profile);
+      }
+    }
+  }
+
+  return suggestedProfiles;
+}

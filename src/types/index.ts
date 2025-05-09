@@ -24,6 +24,7 @@ export interface UserProfile {
   isActive?: boolean; 
   pendingInvitationsCount?: number;
   pendingInvitations?: string[]; // Could be array of invitation IDs or user IDs who sent them
+  suggestedConnections?: UserProfile[]; // For FoF, to avoid re-fetching in component
 }
 
 export interface WorkExperience {
@@ -140,5 +141,21 @@ export interface Invitation {
     status: 'pending' | 'accepted' | 'ignored' | 'cancelled';
     createdAt: Timestamp | string;
     updatedAt?: Timestamp | string;
+}
+
+export interface Article {
+  id: string;
+  authorId: string;
+  author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
+  title: string;
+  content: string; // Could be Markdown or HTML
+  coverImageUrl?: string;
+  tags?: string[];
+  status: 'draft' | 'published';
+  createdAt: Timestamp | string;
+  updatedAt?: Timestamp | string;
+  views?: number;
+  likesCount?: number;
+  commentsCount?: number;
 }
 

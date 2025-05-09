@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLearningCourses as fetchLearningCourses, mockUserProfiles } from "@/lib/mock-data"; 
+import { getLearningCourses } from "@/lib/mock-data"; 
 import { getPostsByAuthorId, getPosts } from '@/lib/post-service'; 
 import type { Post as PostType, LearningCourse, UserProfile, Skill } from "@/types";
 import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
@@ -16,6 +16,8 @@ import { useAuth } from '@/context/auth-context';
 import CreatePostDialog from '@/components/posts/create-post-dialog';
 import PostActions from '@/components/posts/post-actions'; 
 import CommentSection from '@/components/posts/comment-section';
+import { getFriendsOfFriendsSuggestions } from '@/lib/user-service'; // Added for FoF
+import { useToast } from '@/hooks/use-toast';
 
 function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
   const { currentUser, loadingAuth } = useAuth();
@@ -46,11 +48,15 @@ function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
             <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
               <Video className="mr-2 h-5 w-5 text-green-500" /> Video
             </Button>
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
-              <Briefcase className="mr-2 h-5 w-5 text-purple-500" /> Job
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" asChild>
+              <Link href="/jobs/post">
+                <Briefcase className="mr-2 h-5 w-5 text-purple-500" /> Job
+              </Link>
             </Button>
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
-              <Edit3 className="mr-2 h-5 w-5 text-orange-500" /> Write article
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" asChild>
+              <Link href="/articles/create">
+                <Edit3 className="mr-2 h-5 w-5 text-orange-500" /> Write article
+              </Link>
             </Button>
           </div>
         </CardContent>
@@ -115,7 +121,7 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
   };
   
   return (
-    <Card className="mb-4">
+    <Card className="mb-4" key={post.id}>
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
           <Link href={`/profile/${post.author.uid}`}>
@@ -208,59 +214,74 @@ function ProfileSummaryCard() {
 }
 
 function PeopleMayKnowCard() {
-  const { currentUser } = useAuth();
+  const { currentUser, loadingAuth } = useAuth();
+  const { toast } = useToast();
   const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(true);
 
   useEffect(() => {
-    if (currentUser) {
-      const currentUserLocation = currentUser.location;
-      const currentUserConnections = currentUser.connections || [];
-      const currentUserPendingInvitations = currentUser.pendingInvitations || []; 
-      
-      const filteredSuggestions = mockUserProfiles.filter(p => 
-        p.uid !== currentUser.uid && 
-        !currentUserConnections.includes(p.uid) &&
-        !currentUserPendingInvitations.some(invId => invId === p.uid) && 
-        (currentUserLocation ? p.location === currentUserLocation : true) 
-      ).slice(0,3);
-      setSuggestions(filteredSuggestions);
+    async function fetchSuggestions() {
+      if (currentUser) {
+        setIsLoadingSuggestions(true);
+        try {
+          const fofSuggestions = await getFriendsOfFriendsSuggestions(currentUser.uid, 3);
+          setSuggestions(fofSuggestions);
+        } catch (error) {
+          console.error("Error fetching People You May Know:", error);
+          toast({ title: "Error", description: "Could not load suggestions.", variant: "destructive"});
+        } finally {
+          setIsLoadingSuggestions(false);
+        }
+      }
     }
-  }, [currentUser]);
+    if (!loadingAuth && currentUser) {
+      fetchSuggestions();
+    }
+  }, [currentUser, loadingAuth, toast]);
 
 
-  if (!currentUser || suggestions.length === 0) return null;
+  if (loadingAuth) return <Card className="p-4 flex justify-center items-center h-48"><Loader2 className="h-8 w-8 animate-spin text-primary"/></Card>;
+  if (!currentUser || (!isLoadingSuggestions && suggestions.length === 0)) return null;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-md">People you may know {currentUser.location ? `from ${currentUser.location}` : ''}</CardTitle>
+        <CardTitle className="text-md">People you may know</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {suggestions.map(person => (
-          <div key={person.uid} className="flex items-center space-x-3">
-            <Link href={`/profile/${person.uid}`}>
-                <Avatar>
-                <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
-                <AvatarFallback>{person.firstName?.charAt(0)}{person.lastName?.charAt(0)}</AvatarFallback>
-                </Avatar>
-            </Link>
-            <div className="flex-grow">
-              <Link href={`/profile/${person.uid}`} className="font-semibold text-sm hover:underline">{person.firstName} {person.lastName}</Link>
-              <p className="text-xs text-muted-foreground">{person.headline}</p>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/network?search=${person.firstName}%20${person.lastName}`}>
-                <Link2 className="h-4 w-4 mr-1" /> Connect
-              </Link>
-            </Button>
+        {isLoadingSuggestions ? (
+          <div className="flex justify-center items-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
-        ))}
+        ) : (
+          suggestions.map(person => (
+            <div key={person.uid} className="flex items-center space-x-3">
+              <Link href={`/profile/${person.uid}`}>
+                  <Avatar>
+                  <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
+                  <AvatarFallback>{person.firstName?.charAt(0)}{person.lastName?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+              </Link>
+              <div className="flex-grow">
+                <Link href={`/profile/${person.uid}`} className="font-semibold text-sm hover:underline">{person.firstName} {person.lastName}</Link>
+                <p className="text-xs text-muted-foreground">{person.headline}</p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/network?search=${person.firstName}%20${person.lastName}`}>
+                  <Link2 className="h-4 w-4 mr-1" /> Connect
+                </Link>
+              </Button>
+            </div>
+          ))
+        )}
       </CardContent>
-      <CardFooter>
-        <Button variant="ghost" className="w-full text-primary" asChild>
-          <Link href="/network">Show more</Link>
-        </Button>
-      </CardFooter>
+      {suggestions.length > 0 && !isLoadingSuggestions && (
+        <CardFooter>
+          <Button variant="ghost" className="w-full text-primary" asChild>
+            <Link href="/network">Show more</Link>
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 }
@@ -278,8 +299,6 @@ export default function HomePage() {
     if (!currentUser) return; 
     setIsLoadingPageData(true);
     try {
-      // For the main feed, fetch posts from everyone or a curated selection.
-      // Here, we fetch all posts. For a real app, this would be paginated and curated.
       const allPostsData = await getPosts(); 
       
       allPostsData.sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
@@ -305,15 +324,17 @@ export default function HomePage() {
         await fetchFeedPosts(); 
         
         const learningCoursesData = await fetchLearningCourses();
+        // For "Recommended Learning", filter based on user's skills or search history (mocked for now)
         const userSkills = currentUser.skills?.map(skill => skill.name.toLowerCase()) || [];
-        if (userSkills.length > 0 && learningCoursesData.length > 0) {
-            const matchingCourses = learningCoursesData.filter(course => 
+        let filteredCourses = learningCoursesData;
+        if (userSkills.length > 0) {
+            const matching = learningCoursesData.filter(course => 
                 course.keywords?.some(keyword => userSkills.includes(keyword.toLowerCase()))
-            ).slice(0,2); 
-            setRecommendedCourses(matchingCourses.length > 0 ? matchingCourses : learningCoursesData.slice(0,2));
-        } else {
-            setRecommendedCourses(learningCoursesData.slice(0,2)); 
+            );
+            if (matching.length > 0) filteredCourses = matching;
         }
+        setRecommendedCourses(filteredCourses.slice(0,2)); // Show 2 courses
+        
         setIsLoadingPageData(false); 
       }
     }
