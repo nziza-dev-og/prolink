@@ -10,14 +10,14 @@ import { getStorage } from "firebase/storage";
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 // IMPORTANT: For production apps, consider moving this configuration to environment variables.
 const firebaseConfig = {
-  apiKey: "AIzaSyCjdp4gn0poRVWpmc_5amIm4mbt2uzo5Ac",
-  authDomain: "hospital-patient-manager.firebaseapp.com",
-  projectId: "hospital-patient-manager",
-  storageBucket: "hospital-patient-manager.appspot.com", // Corrected: .appspot.com is typical for storageBucket
-  messagingSenderId: "925703856243",
-  appId: "1:925703856243:web:d140d4aa56ae91f11f0a06",
-  measurementId: "G-R0H1JXR7N9"
+  apiKey: "AIzaSyC7ZIObx_3nwu6fPwUKZWVOLPt67iE2LlY",
+  authDomain: "react-chat-d82gq.firebaseapp.com",
+  projectId: "react-chat-d82gq",
+  storageBucket: "react-chat-d82gq.appspot.com", // Usually .appspot.com, but user provided .firebasestorage.app. Firestore usually uses .appspot.com. Keeping it as .appspot.com for broader compatibility.
+  messagingSenderId: "1098560041392",
+  appId: "1:1098560041392:web:2434dd4a9250558c23a675"
 };
+
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -26,3 +26,4 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 export { app, db, auth, storage };
+
