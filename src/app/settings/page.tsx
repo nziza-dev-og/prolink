@@ -7,17 +7,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/context/auth-context';
 import { updateUserProfile } from '@/lib/user-service';
-import { uploadFile } from '@/lib/storage-service'; // New import
-import { Button } from '@/components/ui/button';
+import { uploadFile } from '@/lib/storage-service';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // New import
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Camera } from 'lucide-react'; // Added Camera icon
+import { Loader2, Camera } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils'; // Added missing import
 
 const profileFormSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -108,10 +109,10 @@ export default function SettingsPage() {
       const filePath = `profilePictures/${currentUser.uid}/${profilePictureFile.name}`;
       const downloadURL = await uploadFile(profilePictureFile, filePath);
       await updateUserProfile(currentUser.uid, { profilePictureUrl: downloadURL });
-      await refetchUserProfile();
+      await refetchUserProfile(); // This will update currentUser in AuthContext, which should re-trigger useEffect for imagePreviewUrl
       toast({ title: 'Profile Picture Updated', description: 'Your new profile picture is now live.' });
       setProfilePictureFile(null); 
-      // imagePreviewUrl is already set to the new local URL or will be updated by refetchUserProfile
+      // imagePreviewUrl will be updated via useEffect when currentUser.profilePictureUrl changes
     } catch (error: any) {
       toast({ title: 'Upload Failed', description: error.message || 'Could not upload profile picture.', variant: 'destructive' });
     } finally {
@@ -139,7 +140,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-4">
             <Avatar className="h-24 w-24">
-              <AvatarImage src={imagePreviewUrl || currentUser.profilePictureUrl} alt={currentUser.firstName} data-ai-hint="user avatar large"/>
+              <AvatarImage src={imagePreviewUrl || currentUser.profilePictureUrl} alt={currentUser.firstName || 'User'} data-ai-hint="user avatar large"/>
               <AvatarFallback className="text-3xl">
                 {currentUser.firstName?.charAt(0)}
                 {currentUser.lastName?.charAt(0)}
