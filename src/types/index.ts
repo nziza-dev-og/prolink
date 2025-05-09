@@ -122,9 +122,9 @@ export interface LearningCourse {
 
 export interface Notification {
   id: string;
-  type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment" | "connection_accepted";
+  type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment" | "connection_accepted" | "admin_broadcast";
   user?: {
-    id: string; 
+    id: string;
     name: string;
     avatarUrl?: string;
   };

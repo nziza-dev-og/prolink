@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
@@ -6,10 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { getTotalUsersCount } from '@/lib/user-service';
 import { getTotalPostsCount } from '@/lib/post-service';
+import { createAdminBroadcast } from '@/lib/notification-service';
+
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -23,6 +27,9 @@ export default function AdminDashboardPage() {
 
   const [newSecretCode, setNewSecretCode] = useState('');
   const [isSavingSecret, setIsSavingSecret] = useState(false);
+
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -82,6 +89,25 @@ export default function AdminDashboardPage() {
     setIsSavingSecret(false);
   };
 
+  const handleBroadcastNotification = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!broadcastMessage.trim()) {
+      toast({ title: "Invalid Message", description: "Broadcast message cannot be empty.", variant: "destructive" });
+      return;
+    }
+    setIsBroadcasting(true);
+    try {
+      await createAdminBroadcast(broadcastMessage);
+      toast({ title: "Broadcast Sent", description: "Notification has been sent to all users." });
+      setBroadcastMessage('');
+    } catch (error) {
+      console.error("Error sending broadcast:", error);
+      toast({ title: "Broadcast Failed", description: "Could not send notification.", variant: "destructive" });
+    } finally {
+      setIsBroadcasting(false);
+    }
+  };
+
   if (isVerifying) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
@@ -139,6 +165,28 @@ export default function AdminDashboardPage() {
             )}
           </section>
 
+           <section>
+            <h3 className="text-xl font-semibold mb-3">Broadcast Notification</h3>
+            <form onSubmit={handleBroadcastNotification} className="space-y-4 max-w-md">
+              <div>
+                <Label htmlFor="broadcastMessage">Message for All Users</Label>
+                <Textarea
+                  id="broadcastMessage"
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  placeholder="Enter notification message..."
+                  disabled={isBroadcasting}
+                  rows={3}
+                  className="mt-1"
+                />
+              </div>
+              <Button type="submit" disabled={isBroadcasting || !broadcastMessage.trim()}>
+                {isBroadcasting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Send Broadcast
+              </Button>
+            </form>
+          </section>
+
           <section>
             <h3 className="text-xl font-semibold mb-2">Management Tools</h3>
             <div className="space-x-2">
@@ -160,6 +208,7 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setNewSecretCode(e.target.value)}
                   placeholder="Enter new secret code"
                   disabled={isSavingSecret}
+                  className="mt-1"
                 />
               </div>
               <Button type="submit" disabled={isSavingSecret}>

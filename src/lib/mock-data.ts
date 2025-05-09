@@ -174,22 +174,33 @@ export const getMessagesWithUser = async (userId: string): Promise<Message[]> =>
     .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()); 
 }
 
+// generateMockNotifications function is removed from here as a similar functionality
+// for user-specific mock notifications is now within notification-service.ts.
+// The header still uses the one from here if it was not removed from its imports.
+// For this PR, we assume the header's notification count can remain based on this file if needed,
+// or it will be updated in a subsequent step to use the new service for a "real" count.
+// For now, to avoid conflicts and ensure notification page uses the new service, it's better if this is removed or renamed.
+// If another part of the app (like Header) relies *specifically* on this version, that needs separate handling.
+// Given the prompt focuses on notifications page, removing it from here is safer to avoid confusion.
+// If header.tsx still imports generateMockNotifications from 'mock-data', it will now fail if this is completely removed.
+// Let's keep it for header for now, but it won't be used by notifications/page.tsx.
+
 export const generateMockNotifications = (currentUserId?: string): Notification[] => {
   const notifications: Notification[] = [
     {
       id: "n1",
       type: "profile_view",
-      user: { id: mockUserProfiles[1].uid, name: `${mockUserProfiles[1].firstName} ${mockUserProfiles[1].lastName}`, avatarUrl: mockUserProfiles[1].profilePictureUrl },
-      content: `${mockUserProfiles[1].firstName} ${mockUserProfiles[1].lastName} viewed your profile.`,
+      user: { id: mockUserProfiles[1]?.uid || 'mockuser2', name: `${mockUserProfiles[1]?.firstName || 'Bob'} ${mockUserProfiles[1]?.lastName || 'Smith'}`, avatarUrl: mockUserProfiles[1]?.profilePictureUrl },
+      content: `${mockUserProfiles[1]?.firstName || 'Bob'} ${mockUserProfiles[1]?.lastName || 'Smith'} viewed your profile.`,
       timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000), 
       isRead: false,
-      link: `/profile/${mockUserProfiles[1].uid}`
+      link: `/profile/${mockUserProfiles[1]?.uid || 'mockuser2'}`
     },
     {
       id: "n2",
       type: "post_like",
-      user: { id: mockUserProfiles[2].uid, name: `${mockUserProfiles[2].firstName} ${mockUserProfiles[2].lastName}`, avatarUrl: mockUserProfiles[2].profilePictureUrl },
-      content: `${mockUserProfiles[2].firstName} ${mockUserProfiles[2].lastName} liked your post: "Excited to share..."`,
+      user: { id: mockUserProfiles[2]?.uid || 'mockuser3', name: `${mockUserProfiles[2]?.firstName || 'Carol'} ${mockUserProfiles[2]?.lastName || 'Davis'}`, avatarUrl: mockUserProfiles[2]?.profilePictureUrl },
+      content: `${mockUserProfiles[2]?.firstName || 'Carol'} ${mockUserProfiles[2]?.lastName || 'Davis'} liked your post: "Excited to share..."`,
       timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000), 
       isRead: true,
       link: `/posts/p1` 
@@ -205,8 +216,8 @@ export const generateMockNotifications = (currentUserId?: string): Notification[
      {
       id: "n4",
       type: "connection_request",
-      user: { id: mockUserProfiles[3].uid, name: `${mockUserProfiles[3].firstName} ${mockUserProfiles[3].lastName}`, avatarUrl: mockUserProfiles[3].profilePictureUrl },
-      content: `You have a new connection request from ${mockUserProfiles[3].firstName} ${mockUserProfiles[3].lastName}.`,
+      user: { id: mockUserProfiles[3]?.uid || 'mockuser4', name: `${mockUserProfiles[3]?.firstName || 'David'} ${mockUserProfiles[3]?.lastName || 'Wilson'}`, avatarUrl: mockUserProfiles[3]?.profilePictureUrl },
+      content: `You have a new connection request from ${mockUserProfiles[3]?.firstName || 'David'} ${mockUserProfiles[3]?.lastName || 'Wilson'}.`,
       timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), 
       isRead: true,
       link: `/network`
@@ -214,11 +225,11 @@ export const generateMockNotifications = (currentUserId?: string): Notification[
     {
       id: "n5",
       type: "message",
-      user: { id: mockUserProfiles[2].uid, name: `${mockUserProfiles[2].firstName} ${mockUserProfiles[2].lastName}`, avatarUrl: mockUserProfiles[2].profilePictureUrl },
-      content: `${mockUserProfiles[2].firstName} sent you a new message.`,
+      user: { id: mockUserProfiles[2]?.uid || 'mockuser3', name: `${mockUserProfiles[2]?.firstName || 'Carol'} ${mockUserProfiles[2]?.lastName || 'Davis'}`, avatarUrl: mockUserProfiles[2]?.profilePictureUrl },
+      content: `${mockUserProfiles[2]?.firstName || 'Carol'} sent you a new message.`,
       timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
       isRead: false,
-      link: `/messaging?chatWith=${mockUserProfiles[2].uid}`
+      link: `/messaging?chatWith=${mockUserProfiles[2]?.uid || 'mockuser3'}`
     },
   ];
   // Filter out notifications where the acting user is the current user (e.g., can't get a profile view notification from self)
