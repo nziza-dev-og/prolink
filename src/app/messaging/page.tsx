@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react'; // Added useMemo
 import { useRouter, useSearchParams } from 'next/navigation'; // useSearchParams for query param
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -57,7 +57,7 @@ export default function MessagingPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   
-  const allMockProfiles = mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString(), connectionsCount: p.connectionsCount || 0}));
+  const allMockProfiles = useMemo(() => mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString(), connectionsCount: p.connectionsCount || 0})), []);
 
 
   useEffect(() => {
