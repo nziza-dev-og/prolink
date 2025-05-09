@@ -31,15 +31,27 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
 
   if (userSnap.exists()) {
     const data = userSnap.data();
-    // Ensure createdAt is a string if it's a Timestamp
-    const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : data.createdAt;
     
-    return { 
+    // Create a base profile object that can be typed safely
+    const profile: { [key: string]: any } = { 
       ...data,
       id: userSnap.id,
       uid: userSnap.id,
-      createdAt,
-    } as UserProfile;
+    };
+
+    // Convert Timestamps to ISO strings
+    if (data.createdAt) {
+      profile.createdAt = data.createdAt instanceof Timestamp 
+        ? data.createdAt.toDate().toISOString() 
+        : String(data.createdAt); // Ensure it's a string
+    }
+    if (data.updatedAt) {
+      profile.updatedAt = data.updatedAt instanceof Timestamp 
+        ? data.updatedAt.toDate().toISOString() 
+        : String(data.updatedAt); // Ensure it's a string
+    }
+    
+    return profile as UserProfile;
   } else {
     return null;
   }
@@ -55,3 +67,4 @@ export async function updateUserProfile(userId: string, data: Partial<Omit<UserP
 
   await updateDoc(userRef, updateData);
 }
+
