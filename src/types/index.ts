@@ -19,10 +19,10 @@ export interface UserProfile {
   recommendations?: Recommendation[];
   createdAt: Timestamp | string; 
   updatedAt?: Timestamp | string; 
-  lastLogin?: Timestamp | string; // Optional: Track last login
+  lastLogin?: Timestamp | string; 
   isActive?: boolean; 
-  pendingInvitationsCount?: number; 
-  pendingInvitations?: string[]; 
+  pendingInvitationsCount?: number;
+  pendingInvitations?: string[]; // Could be array of invitation IDs or user IDs who sent them
 }
 
 export interface WorkExperience {
@@ -120,14 +120,23 @@ export interface LearningCourse {
 
 export interface Notification {
   id: string;
-  type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment";
+  type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment" | "connection_accepted";
   user?: {
     id: string; 
     name: string;
     avatarUrl?: string;
   };
   content: string;
-  timestamp: Date; // Keep as Date for easy formatting on client
+  timestamp: Date; 
   isRead: boolean;
   link?: string;
+}
+
+export interface Invitation {
+    id: string;
+    fromUserId: string;
+    toUserId: string;
+    status: 'pending' | 'accepted' | 'ignored' | 'cancelled';
+    createdAt: Timestamp | string;
+    updatedAt?: Timestamp | string;
 }
