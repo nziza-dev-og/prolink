@@ -1,7 +1,7 @@
 'use server';
 import type { UserProfile } from '@/types';
 import { db } from './firebase';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp, Timestamp, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, Timestamp, collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 
 export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections'>): Promise<void> {
   const userRef = doc(db, 'users', userId);
@@ -74,15 +74,17 @@ export async function updateUserProfile(userId: string, data: Partial<Omit<UserP
   if (data.connections) {
     updateData.connectionsCount = data.connections.length;
   }
-
-  // Ensure profilePictureUrl is handled correctly: if an empty string is passed, it means remove the picture.
-  // Firestore doesn't store undefined fields. If `data.profilePictureUrl` is an empty string, 
-  // and you want to remove it, you might need to handle this specifically if your default image logic relies on undefined.
-  // For now, if it's '', it will be stored as ''. If it's undefined, it won't be updated.
-  if(data.profilePictureUrl === ''){
-     // If you want to revert to a default or remove, handle here.
-     // For this implementation, an empty string will be saved.
-     // If you want to truly remove it to use a default, you might set it to a specific "removed" value or delete the field.
+  
+  if (data.profilePictureUrl === '') {
+    // If an empty string is passed for profilePictureUrl,
+    // it means the user wants to remove/reset it.
+    // We can set it to a default or handle as per application logic.
+    // For now, we allow an empty string to be saved, or set to undefined to remove from doc.
+    // Let's use a default if it's empty.
+    updateData.profilePictureUrl = `https://picsum.photos/seed/${userId}/200/200`;
+  } else if (data.profilePictureUrl === undefined && !Object.prototype.hasOwnProperty.call(data, 'profilePictureUrl')) {
+    // If profilePictureUrl is not in data at all, don't touch it.
+    // If it's explicitly undefined (though Zod schema makes it optional().or(z.literal(''))), handle if needed.
   }
 
 
@@ -100,8 +102,57 @@ export async function getAllUserProfiles(): Promise<UserProfile[]> {
   const querySnapshot = await getDocs(query(usersCollectionRef, orderBy('createdAt', 'desc')));
   
   return Promise.all(querySnapshot.docs.map(async (docSnapshot) => {
-    // Re-use getUserProfile logic to ensure consistent data transformation, especially for dates
-    // This is slightly less performant than direct mapping but ensures consistency
     return (await getUserProfile(docSnapshot.id)) as UserProfile; 
   }));
+}
+
+export async function searchUserProfiles(searchTerm: string, currentUserId: string): Promise<UserProfile[]> {
+  if (!searchTerm.trim()) {
+    return [];
+  }
+
+  const usersCollectionRef = collection(db, 'users');
+  const profilesMap = new Map<string, UserProfile>();
+
+  // Query by email (exact match)
+  const emailQuery = query(usersCollectionRef, where('email', '==', searchTerm));
+  const emailSnap = await getDocs(emailQuery);
+  for (const docSnap of emailSnap.docs) {
+    if (docSnap.id !== currentUserId) {
+      const profile = await getUserProfile(docSnap.id);
+      if (profile) profilesMap.set(docSnap.id, profile);
+    }
+  }
+
+  // Query by first name (prefix match - case sensitive)
+  const firstNameQuery = query(
+    usersCollectionRef,
+    where('firstName', '>=', searchTerm),
+    where('firstName', '<=', searchTerm + '\uf8ff'),
+    orderBy('firstName') // Required for range queries on different fields
+  );
+  const firstNameSnap = await getDocs(firstNameQuery);
+  for (const docSnap of firstNameSnap.docs) {
+    if (docSnap.id !== currentUserId && !profilesMap.has(docSnap.id)) {
+      const profile = await getUserProfile(docSnap.id);
+      if (profile) profilesMap.set(docSnap.id, profile);
+    }
+  }
+
+  // Query by last name (prefix match - case sensitive)
+  const lastNameQuery = query(
+    usersCollectionRef,
+    where('lastName', '>=', searchTerm),
+    where('lastName', '<=', searchTerm + '\uf8ff'),
+    orderBy('lastName') // Required for range queries on different fields
+  );
+  const lastNameSnap = await getDocs(lastNameQuery);
+  for (const docSnap of lastNameSnap.docs) {
+    if (docSnap.id !== currentUserId && !profilesMap.has(docSnap.id)) {
+      const profile = await getUserProfile(docSnap.id);
+      if (profile) profilesMap.set(docSnap.id, profile);
+    }
+  }
+  
+  return Array.from(profilesMap.values()).slice(0, 10); // Limit results
 }

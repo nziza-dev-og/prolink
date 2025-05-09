@@ -7,11 +7,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockUserProfiles, generateMockNotifications } from "@/lib/mock-data"; // Using mock profiles for now
-import type { UserProfile, Notification as NotificationType } from "@/types"; // Added NotificationType
-import { UserPlus, Users, Loader2, Contact, Search, CalendarIcon, UserRoundCog } from "lucide-react"; // Added Search, CalendarIcon, UserRoundCog
+import { mockUserProfiles, generateMockNotifications } from "@/lib/mock-data"; 
+import type { UserProfile, Notification as NotificationType } from "@/types"; 
+import { UserPlus, Users, Loader2, Contact, Search, CalendarIcon, UserRoundCog } from "lucide-react"; 
 import { useAuth } from '@/context/auth-context';
-import { getAllUserProfiles } from '@/lib/user-service';
+import { searchUserProfiles } from '@/lib/user-service'; // Import the new search function
 
 
 function InvitationCard({ user }: { user: UserProfile }) {
@@ -64,11 +64,13 @@ export default function NetworkPage() {
   const { currentUser, loadingAuth } = useAuth();
   const router = useRouter();
   
-  const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
-  const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
-  const [invitations, setInvitations] = useState<UserProfile[]>([]); // Using NotificationType for mock invitations
+  // For mock "People you may know" and "Invitations"
+  const [allMockProfiles, setAllMockProfiles] = useState<UserProfile[]>([]); 
+  const [invitations, setInvitations] = useState<UserProfile[]>([]); 
+  
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
+  const [displayedSuggestions, setDisplayedSuggestions] = useState<UserProfile[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(true);
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -76,63 +78,55 @@ export default function NetworkPage() {
     }
   }, [currentUser, loadingAuth, router]);
 
+  // Load mock profiles for default suggestions and invitations (can be replaced later)
   useEffect(() => {
-    async function loadProfiles() {
-      setIsLoadingProfiles(true);
-      try {
-        // In a real app, fetch all users or a paginated list. For now, use mock or fetch all from Firebase.
-        // const profiles = await getAllUserProfiles(); // This might be too slow for many users
-        const profiles = mockUserProfiles; // Using mock for now for performance
-        setAllProfiles(profiles);
-      } catch (error) {
-        console.error("Error fetching profiles:", error);
-      } finally {
-        setIsLoadingProfiles(false);
-      }
-    }
     if (currentUser) {
-      loadProfiles();
+      setAllMockProfiles(mockUserProfiles);
       // Mock invitations (these would come from a specific 'invitations' collection or notifications)
       const mockInvites = generateMockNotifications(currentUser.uid)
         .filter(n => n.type === 'connection_request' && n.user)
-        .map(n => allProfiles.find(p => p.uid === n.user!.id)!)
-        .filter(Boolean); // Filter out undefined if user not found in allProfiles
-      setInvitations(mockInvites as UserProfile[]);
+        .map(n => mockUserProfiles.find(p => p.uid === n.user!.id)!)
+        .filter(Boolean) as UserProfile[];
+      setInvitations(mockInvites);
     }
-  }, [currentUser, allProfiles]); // Re-run if allProfiles changes (e.g. for mock data population of invites)
+  }, [currentUser]);
 
-  const filteredSuggestions = useMemo(() => {
-    if (!currentUser || allProfiles.length === 0) return [];
-
-    const currentUserConnections = currentUser.connections || [];
-    const invitationUIDs = invitations.map(inv => inv.uid);
-
-    if (searchTerm.trim() !== '') {
-      return allProfiles.filter(p =>
-        p.uid !== currentUser.uid &&
-        !currentUserConnections.includes(p.uid) &&
-        !invitationUIDs.includes(p.uid) &&
-        (
-          p.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          p.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (p.email && p.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (p.headline && p.headline.toLowerCase().includes(searchTerm.toLowerCase()))
-        )
-      ).slice(0, 10); // Limit search results
-    } else {
-      // Default suggestions: people from the same location, not connected, not invited
-      return allProfiles.filter(p =>
-        p.uid !== currentUser.uid &&
-        !currentUserConnections.includes(p.uid) &&
-        !invitationUIDs.includes(p.uid) &&
-        (currentUser.location ? p.location === currentUser.location : true)
-      ).slice(0, 6);
-    }
-  }, [currentUser, allProfiles, searchTerm, invitations]);
-
+  // Effect for handling search or default suggestions
   useEffect(() => {
-    setSuggestions(filteredSuggestions);
-  }, [filteredSuggestions]);
+    async function fetchAndSetSuggestions() {
+      if (!currentUser) return;
+
+      setIsLoadingSuggestions(true);
+      if (searchTerm.trim()) {
+        try {
+          const results = await searchUserProfiles(searchTerm, currentUser.uid);
+          setDisplayedSuggestions(results);
+        } catch (error) {
+          console.error("Error searching profiles:", error);
+          setDisplayedSuggestions([]);
+          // todo: toast error
+        }
+      } else {
+        // Default suggestions: people from the same location, not connected, not invited (using mock data for now)
+        const currentUserConnections = currentUser.connections || [];
+        const invitationUIDs = invitations.map(inv => inv.uid);
+        const defaultSugg = allMockProfiles.filter(p =>
+          p.uid !== currentUser.uid &&
+          !currentUserConnections.includes(p.uid) &&
+          !invitationUIDs.includes(p.uid) &&
+          (currentUser.location ? p.location === currentUser.location : true)
+        ).slice(0, 6);
+        setDisplayedSuggestions(defaultSugg);
+      }
+      setIsLoadingSuggestions(false);
+    }
+
+    if (!loadingAuth && currentUser) {
+        fetchAndSetSuggestions();
+    } else if (!loadingAuth && !currentUser) {
+        setIsLoadingSuggestions(false); // Not logged in, no suggestions to load
+    }
+  }, [searchTerm, currentUser, loadingAuth, invitations, allMockProfiles]);
 
 
   if (loadingAuth || (!currentUser && !loadingAuth)) {
@@ -196,7 +190,7 @@ export default function NetworkPage() {
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                     type="search" 
-                    placeholder="Search by name, email or headline..." 
+                    placeholder="Search by name or email..." 
                     className="pl-8" 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -212,25 +206,26 @@ export default function NetworkPage() {
               {invitations.length > 3 && <Button variant="ghost" size="sm" disabled>See all {invitations.length}</Button>}
             </CardHeader>
             <CardContent className="space-y-4">
-              {invitations.slice(0,3).map(user => ( // Show max 3 invitations initially
+              {invitations.slice(0,3).map(user => ( 
                 <InvitationCard key={user.uid} user={user} />
               ))}
             </CardContent>
           </Card>
         )}
         
-        {isLoadingProfiles && searchTerm === '' ? (
+        {isLoadingSuggestions ? (
             <div className="flex justify-center items-center py-10"> <Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
-        ) : suggestions.length > 0 ? (
+        ) : displayedSuggestions.length > 0 ? (
             <div>
             <div className="flex justify-between items-center mb-2">
                 <h2 className="text-lg font-semibold">
                     {searchTerm ? 'Search Results' : `People you may know ${currentUser.location ? `from ${currentUser.location}` : ''}`}
                 </h2>
-                {suggestions.length > 6 && !searchTerm && <Button variant="ghost" size="sm" disabled>See all</Button>}
+                {/* Display "See all" only for default suggestions if there are more than shown */}
+                {displayedSuggestions.length > 6 && !searchTerm && <Button variant="ghost" size="sm" disabled>See all</Button>}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {suggestions.map(user => ( 
+                {displayedSuggestions.map(user => ( 
                 <SuggestionCard key={user.uid} user={user} />
                 ))}
             </div>
@@ -238,7 +233,7 @@ export default function NetworkPage() {
         ) : (
              <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">
-                    {searchTerm ? 'No users found matching your search.' : 'No new suggestions right now.'}
+                    {searchTerm ? 'No users found matching your search.' : 'No new suggestions right now. Try searching for people you know.'}
                 </CardContent>
             </Card>
         )}
@@ -246,4 +241,3 @@ export default function NetworkPage() {
     </div>
   );
 }
-
