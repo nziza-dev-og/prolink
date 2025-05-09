@@ -6,11 +6,12 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import Image from 'next/image';
 import { useAuth } from '@/context/auth-context';
 import { updateUserProfile } from '@/lib/user-service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label as ShadCnLabel } from '@/components/ui/label'; // Renamed to avoid conflict with FormLabel
+import { Label as ShadCnLabel } from '@/components/ui/label'; 
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -27,6 +28,7 @@ const profileFormSchema = z.object({
   summary: z.string().optional(),
   location: z.string().optional(),
   profilePictureUrl: z.string().url("Must be a valid URL for profile picture.").optional().or(z.literal('')),
+  coverPhotoUrl: z.string().url("Must be a valid URL for cover photo.").optional().or(z.literal('')),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -38,6 +40,8 @@ export default function SettingsPage() {
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
 
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [coverImagePreviewUrl, setCoverImagePreviewUrl] = useState<string | null>(null);
+
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -48,6 +52,7 @@ export default function SettingsPage() {
       summary: '',
       location: '',
       profilePictureUrl: '',
+      coverPhotoUrl: '',
     },
   });
 
@@ -60,6 +65,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (currentUser) {
       const initialProfilePicUrl = currentUser.profilePictureUrl || '';
+      const initialCoverPhotoUrl = currentUser.coverPhotoUrl || '';
       form.reset({
         firstName: currentUser.firstName || '',
         lastName: currentUser.lastName || '',
@@ -67,12 +73,16 @@ export default function SettingsPage() {
         summary: currentUser.summary || '',
         location: currentUser.location || '',
         profilePictureUrl: initialProfilePicUrl,
+        coverPhotoUrl: initialCoverPhotoUrl,
       });
       setImagePreviewUrl(initialProfilePicUrl || null);
+      setCoverImagePreviewUrl(initialCoverPhotoUrl || null);
     }
   }, [currentUser, form]);
 
   const watchedProfilePictureUrl = form.watch('profilePictureUrl');
+  const watchedCoverPhotoUrl = form.watch('coverPhotoUrl');
+
   useEffect(() => {
     if (watchedProfilePictureUrl && watchedProfilePictureUrl.trim() !== "") {
       setImagePreviewUrl(watchedProfilePictureUrl);
@@ -83,13 +93,25 @@ export default function SettingsPage() {
     }
   }, [watchedProfilePictureUrl, currentUser]);
 
+  useEffect(() => {
+    if (watchedCoverPhotoUrl && watchedCoverPhotoUrl.trim() !== "") {
+      setCoverImagePreviewUrl(watchedCoverPhotoUrl);
+    } else if (currentUser) {
+      setCoverImagePreviewUrl(currentUser.coverPhotoUrl || null);
+    } else {
+      setCoverImagePreviewUrl(null);
+    }
+  }, [watchedCoverPhotoUrl, currentUser]);
+
+
   const onProfileSubmit = async (values: ProfileFormValues) => {
     if (!currentUser) return;
     setIsSubmittingProfile(true);
     try {
       await updateUserProfile(currentUser.uid, { 
         ...values,
-        profilePictureUrl: values.profilePictureUrl || undefined 
+        profilePictureUrl: values.profilePictureUrl || undefined,
+        coverPhotoUrl: values.coverPhotoUrl || undefined,
       });
       await refetchUserProfile();
       toast({ title: 'Profile Updated', description: 'Your profile information has been successfully updated.' });
@@ -137,6 +159,37 @@ export default function SettingsPage() {
                     <FormLabel>Profile Picture URL</FormLabel>
                     <FormControl>
                       <Input placeholder="https://example.com/your-image.png" {...field} disabled={isSubmittingProfile} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Cover Photo</CardTitle>
+              <CardDescription>Update your cover photo by providing an image URL.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative h-48 w-full bg-muted rounded-md overflow-hidden">
+                {coverImagePreviewUrl ? (
+                  <Image src={coverImagePreviewUrl} alt="Cover photo preview" layout="fill" objectFit="cover" data-ai-hint="profile cover background"/>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <span>No cover photo</span>
+                  </div>
+                )}
+              </div>
+              <FormField
+                control={form.control}
+                name="coverPhotoUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cover Photo URL</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://example.com/your-cover-image.png" {...field} disabled={isSubmittingProfile} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -269,5 +322,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    

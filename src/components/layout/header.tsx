@@ -1,8 +1,9 @@
+
 'use client';
 
 import Link from 'next/link';
 import { Bell, Briefcase, Home, MessageSquareText, Search, Users, ChevronDown, LogOut, Settings, User as UserIcon, Loader2, ShieldCheck } from 'lucide-react';
-import { LinkedInLogo } from '@/components/icons/linkedin-logo';
+import { ProLinkLogo } from '@/components/icons/prolink-logo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -78,7 +79,7 @@ export default function Header() {
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Link href="/" aria-label="ProLink Home">
-            <LinkedInLogo className="h-8 w-8" />
+            <ProLinkLogo className="h-8 w-8" />
           </Link>
           {currentUser && (
             <div className="relative hidden sm:block">
