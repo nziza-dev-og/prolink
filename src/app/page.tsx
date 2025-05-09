@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -7,7 +8,7 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLearningCourses as fetchLearningCourses } from "@/lib/mock-data"; 
+import { getLearningCourses as fetchLearningCoursesFromMock } from "@/lib/mock-data"; 
 import { getPosts } from '@/lib/post-service'; 
 import type { Post as PostType, LearningCourse, UserProfile } from "@/types";
 import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
@@ -121,7 +122,7 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
   };
   
   return (
-    <Card className="mb-4" key={post.id + '-post-card'}>
+    <Card className="mb-4" key={`${post.id}-postcard`}>
       <CardHeader className="p-4">
         <div className="flex items-center space-x-3">
           <Link href={`/profile/${post.author.uid}`}>
@@ -193,11 +194,11 @@ function ProfileSummaryCard() {
         <p className="text-sm text-muted-foreground mb-3">{currentUser.headline}</p>
         <div className="border-t pt-3 space-y-1 text-sm">
           <Link href={`/network/connections/${currentUser.uid}`} className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
-            <span>Connections</span>
+            <span>Peer</span>
             <span className="text-primary font-semibold">{connectionsDisplayCount}</span>
           </Link>
            <Link href={`/network?tab=invitations`} className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
-            <span>Invitations</span>
+            <span>Notice</span>
             <span className="text-primary font-semibold">{currentUser.pendingInvitationsCount || 0}</span>
           </Link>
         </div>
@@ -265,7 +266,7 @@ function PeopleMayKnowCard() {
           </div>
         ) : (
           suggestions.map(person => (
-            <div key={person.uid + '-suggestion'} className="flex items-center space-x-3">
+            <div key={`${person.uid}-suggestion`} className="flex items-center space-x-3">
               <Link href={`/profile/${person.uid}`}>
                   <Avatar>
                   <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
@@ -310,11 +311,12 @@ export default function HomePage() {
     setIsLoadingPageData(true);
     try {
       // Fetch posts relevant to the current user, e.g., posts from connections or based on interests.
+      // Also include posts by the current user themselves.
       const userAndConnectionsIds = [currentUser.uid, ...(currentUser.connections || [])];
       const allPostsData = await getPosts(); 
       
       const feedPosts = allPostsData.filter(post => 
-        userAndConnectionsIds.includes(post.authorId) || post.authorId === currentUser.uid
+        userAndConnectionsIds.includes(post.authorId)
       );
 
       feedPosts.sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
@@ -339,7 +341,7 @@ export default function HomePage() {
         setIsLoadingPageData(true); 
         await fetchFeedPosts(); 
         
-        const learningCoursesData = await fetchLearningCourses();
+        const learningCoursesData = await fetchLearningCoursesFromMock();
         const userSkills = currentUser.skills?.map(skill => skill.name.toLowerCase()) || [];
         
         // Prioritize courses matching user skills
@@ -399,7 +401,7 @@ export default function HomePage() {
              </div>
         ) : posts.length > 0 ? (
             posts.map((post) => (
-              <PostCard key={post.id + '-homepage'} post={post} onPostUpdated={handlePostUpdated} />
+              <PostCard key={post.id} post={post} onPostUpdated={handlePostUpdated} />
             ))
         ) : (
           !isLoadingPageData && <Card><CardContent className="p-6 text-center text-muted-foreground">No posts for your feed yet. Connect with more people or create a post!</CardContent></Card>
@@ -428,7 +430,7 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
       </CardHeader>
       <CardContent className="space-y-3">
         {courses.map((course: LearningCourse) => ( 
-          <Link href={`/learning/${course.id}`} key={course.id + '-learning'} className="flex items-center space-x-3 group">
+          <Link href={`/learning/${course.id}`} key={`${course.id}-learning`} className="flex items-center space-x-3 group">
             <Image src={course.thumbnailUrl} alt={course.title} width={80} height={45} className="rounded object-cover" data-ai-hint="course thumbnail"/>
             <div>
               <p className="font-semibold text-sm group-hover:text-primary group-hover:underline">{course.title}</p>
