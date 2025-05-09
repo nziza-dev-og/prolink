@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLearningCourses as fetchLearningCourses, mockUserProfiles } from "@/lib/mock-data"; 
-import { getPosts } from '@/lib/post-service'; 
+import { getPostsByAuthorId, getPosts } from '@/lib/post-service'; 
 import type { Post as PostType, LearningCourse, UserProfile, Skill } from "@/types";
 import { Briefcase, Edit3, Image as ImageIcon, Link2, Loader2, MessageCircle, Repeat, Send, ThumbsUp, Users, Video } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
@@ -38,7 +38,7 @@ function CreatePostCard({ onPostCreated }: { onPostCreated: () => void }) {
             </Button>
           </div>
           <div className="flex justify-around">
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" onClick={() => setIsCreatePostDialogOpen(true)}>
               <ImageIcon className="mr-2 h-5 w-5 text-blue-500" /> Media
             </Button>
             <Button variant="ghost" size="sm" className="text-muted-foreground hover:bg-accent/50" disabled>
@@ -69,7 +69,7 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
     }
   };
   
-  if (!post.author || !post.author.uid) { // Check author and author.uid
+  if (!post.author || !post.author.uid) { 
     console.warn(`PostCard: post.author or post.author.uid is undefined for post ID: ${post.id}. Post data:`, JSON.stringify(post));
     return (
       <Card className="mb-4">
@@ -79,6 +79,26 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
       </Card>
     );
   }
+
+  const renderContentWithLinks = (text: string) => {
+    const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text.split(urlRegex).map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a 
+            key={index} 
+            href={part} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-primary hover:underline break-all"
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
   
   return (
     <Card className="mb-4">
@@ -100,7 +120,7 @@ function PostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (upd
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-2">
-        <p className="text-sm mb-2 whitespace-pre-line">{post.content}</p>
+        <p className="text-sm mb-2 whitespace-pre-line">{renderContentWithLinks(post.content)}</p>
         {post.imageUrl && (
           <div className="my-2 rounded-md overflow-hidden">
             <Image src={post.imageUrl} alt="Post image" width={600} height={400} className="w-full h-auto object-cover" data-ai-hint="social media post"/>
@@ -144,13 +164,14 @@ function ProfileSummaryCard() {
         <Link href={`/profile/${currentUser.uid}`} className="block font-semibold text-lg hover:underline">{currentUser.firstName} {currentUser.lastName}</Link>
         <p className="text-sm text-muted-foreground mb-3">{currentUser.headline}</p>
         <div className="border-t pt-3 space-y-1 text-sm">
-          <Link href={`/network?tab=connections`} className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
+          <Link href={`/network/connections/${currentUser.uid}`} className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
             <span>Connections</span>
             <span className="text-primary font-semibold">{connectionsDisplayCount}</span>
           </Link>
            <Link href={`/network?tab=invitations`} className="flex justify-between items-center text-muted-foreground hover:bg-accent/10 p-1 rounded">
             <span>Invitations</span>
-            <span className="text-primary font-semibold">{/* Mock */}5</span>
+             {/* Mock data for invitations count, replace with actual data if available */}
+            <span className="text-primary font-semibold">{currentUser.pendingInvitationsCount || 0}</span>
           </Link>
         </div>
       </CardContent>
@@ -170,15 +191,18 @@ function PeopleMayKnowCard() {
   const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
 
   useEffect(() => {
+    // This is mock data. In a real app, fetch suggestions from a service.
     if (currentUser) {
       const currentUserLocation = currentUser.location;
       const currentUserConnections = currentUser.connections || [];
+      const currentUserPendingInvitations = currentUser.pendingInvitations || []; // Assuming this field exists
       
       const filteredSuggestions = mockUserProfiles.filter(p => 
-        p.uid !== currentUser.uid && // Not the current user
-        !currentUserConnections.includes(p.uid) && // Not already connected
-        (currentUserLocation ? p.location === currentUserLocation : true) // Same location if current user has one, otherwise all locations
-      ).slice(0,3);
+        p.uid !== currentUser.uid && 
+        !currentUserConnections.includes(p.uid) &&
+        !currentUserPendingInvitations.some(invId => invId === p.uid) && // Don't suggest if already invited
+        (currentUserLocation ? p.location === currentUserLocation : true) 
+      ).slice(0,3); // Limit to 3 suggestions
       setSuggestions(filteredSuggestions);
     }
   }, [currentUser]);
@@ -189,20 +213,22 @@ function PeopleMayKnowCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-md">People you may know {currentUser.location ? `in ${currentUser.location}` : ''}</CardTitle>
+        <CardTitle className="text-md">People you may know {currentUser.location ? `from ${currentUser.location}` : ''}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {suggestions.map(person => (
           <div key={person.uid} className="flex items-center space-x-3">
-            <Avatar>
-              <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
-              <AvatarFallback>{person.firstName?.charAt(0)}{person.lastName?.charAt(0)}</AvatarFallback>
-            </Avatar>
+            <Link href={`/profile/${person.uid}`}>
+                <Avatar>
+                <AvatarImage src={person.profilePictureUrl} alt={person.firstName} data-ai-hint="user avatar small"/>
+                <AvatarFallback>{person.firstName?.charAt(0)}{person.lastName?.charAt(0)}</AvatarFallback>
+                </Avatar>
+            </Link>
             <div className="flex-grow">
               <Link href={`/profile/${person.uid}`} className="font-semibold text-sm hover:underline">{person.firstName} {person.lastName}</Link>
               <p className="text-xs text-muted-foreground">{person.headline}</p>
             </div>
-            <Button variant="outline" size="sm" disabled> 
+            <Button variant="outline" size="sm" disabled> {/* Connect functionality to be implemented */}
               <Link2 className="h-4 w-4 mr-1" /> Connect
             </Button>
           </div>
@@ -223,17 +249,24 @@ export default function HomePage() {
   const router = useRouter();
 
   const [posts, setPosts] = useState<PostType[]>([]);
-  const [allLearningCourses, setAllLearningCourses] = useState<LearningCourse[]>([]);
+  // const [allLearningCourses, setAllLearningCourses] = useState<LearningCourse[]>([]); // Keep if needed for other features
   const [recommendedCourses, setRecommendedCourses] = useState<LearningCourse[]>([]);
   const [isLoadingPageData, setIsLoadingPageData] = useState(true);
 
-  const fetchAllPosts = useCallback(async () => {
-    if (!currentUser) return; // Ensure currentUser is available
+  const fetchUserSpecificPosts = useCallback(async () => {
+    if (!currentUser) return; 
     setIsLoadingPageData(true);
     try {
-      // Fetch all posts, not just user's posts for the main feed
-      const allPostsData = await getPosts(); 
-      setPosts(allPostsData);
+      // Fetch posts specifically by the current user for their feed
+      const userPostsData = await getPostsByAuthorId(currentUser.uid);
+      const allPostsData = await getPosts(); // Fetch all posts to show in feed as well
+      
+      // Combine user's posts with others, ensuring no duplicates and sorting
+      const combinedPosts = [...userPostsData, ...allPostsData.filter(p => p.authorId !== currentUser.uid)];
+      const uniquePosts = Array.from(new Map(combinedPosts.map(p => [p.id, p])).values());
+      uniquePosts.sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime());
+      
+      setPosts(uniquePosts);
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
@@ -250,33 +283,32 @@ export default function HomePage() {
   useEffect(() => {
     async function loadInitialData() {
       if (currentUser) { 
-        setIsLoadingPageData(true); // Start loading
-        await fetchAllPosts(); 
+        setIsLoadingPageData(true); 
+        await fetchUserSpecificPosts(); 
         
         const learningCoursesData = await fetchLearningCourses();
-        setAllLearningCourses(learningCoursesData);
+        // setAllLearningCourses(learningCoursesData); // Keep if needed elsewhere
         
-        // Simulate learning recommendations
+        // Simulate learning recommendations based on user skills
         const userSkills = currentUser.skills?.map(skill => skill.name.toLowerCase()) || [];
         if (userSkills.length > 0 && learningCoursesData.length > 0) {
             const matchingCourses = learningCoursesData.filter(course => 
                 course.keywords?.some(keyword => userSkills.includes(keyword.toLowerCase()))
-            );
-            setRecommendedCourses(matchingCourses.length > 0 ? matchingCourses.slice(0,2) : learningCoursesData.slice(0,2));
+            ).slice(0,2); // Limit to 2 recommendations
+            setRecommendedCourses(matchingCourses.length > 0 ? matchingCourses : learningCoursesData.slice(0,2));
         } else {
-            setRecommendedCourses(learningCoursesData.slice(0,2));
+            setRecommendedCourses(learningCoursesData.slice(0,2)); // Default if no skills or matches
         }
-        // No longer setting otherUsers here, PeopleMayKnowCard handles its own data fetching/filtering
-        setIsLoadingPageData(false); // Finish loading
+        setIsLoadingPageData(false); 
       }
     }
     if (!loadingAuth && currentUser) {
         loadInitialData();
     }
-  }, [currentUser, loadingAuth, fetchAllPosts]);
+  }, [currentUser, loadingAuth, fetchUserSpecificPosts]);
 
   const handlePostCreated = () => {
-    fetchAllPosts(); 
+    fetchUserSpecificPosts(); 
   };
   
   const handlePostUpdated = (updatedPost: PostType) => {
@@ -337,7 +369,7 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
         <CardTitle className="text-md">Recommended learning</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {courses.map((course: LearningCourse) => ( // Show all passed courses, parent component limits to 2
+        {courses.map((course: LearningCourse) => ( 
           <Link href={`/learning/${course.id}`} key={course.id} className="flex items-center space-x-3 group">
             <Image src={course.thumbnailUrl} alt={course.title} width={80} height={45} className="rounded object-cover" data-ai-hint="course thumbnail"/>
             <div>
@@ -353,3 +385,4 @@ function LearningCoursesCard({ courses }: { courses: LearningCourse[] }) {
     </Card>
   )
 }
+

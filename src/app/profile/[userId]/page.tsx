@@ -32,6 +32,26 @@ function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdate
     );
   }
 
+  const renderContentWithLinks = (text: string) => {
+    const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    return text.split(urlRegex).map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a 
+            key={index} 
+            href={part} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-primary hover:underline break-all"
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   return (
     <Card className="mb-4">
       <CardHeader className="p-4">
@@ -52,7 +72,7 @@ function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdate
         </div>
       </CardHeader>
       <CardContent className="px-4 pb-2">
-        <p className="text-sm mb-2 whitespace-pre-line">{post.content}</p>
+        <p className="text-sm mb-2 whitespace-pre-line">{renderContentWithLinks(post.content)}</p>
         {post.imageUrl && (
           <div className="my-2 rounded-md overflow-hidden">
             <Image src={post.imageUrl} alt="Post image" width={600} height={400} className="w-full h-auto object-cover" data-ai-hint="social media post"/>
@@ -280,3 +300,4 @@ export default function UserProfilePage() {
     </div>
   );
 }
+
