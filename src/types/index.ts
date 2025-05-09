@@ -19,6 +19,9 @@ export interface UserProfile {
   recommendations?: Recommendation[];
   createdAt: Timestamp | string; // Firestore Timestamp or ISO string
   updatedAt?: Timestamp | string; // Optional: Firestore Timestamp or ISO string for last update
+  isActive?: boolean; // Added for user online status
+  pendingInvitationsCount?: number; // Keep if used in UI
+  pendingInvitations?: string[]; // Array of user UIDs who sent an invitation
 }
 
 export interface WorkExperience {

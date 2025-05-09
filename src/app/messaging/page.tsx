@@ -1,7 +1,8 @@
+
 'use client';
 
-import { useEffect, useState, useMemo } from 'react'; // Added useMemo
-import { useRouter, useSearchParams } from 'next/navigation'; // useSearchParams for query param
+import { useEffect, useState, useMemo, useRef } from 'react'; 
+import { useRouter, useSearchParams } from 'next/navigation'; 
 import Link from 'next/link';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -11,9 +12,10 @@ import { mockUserProfiles, getMessagesWithUser as fetchMessagesWithUser } from "
 import type { Message, UserProfile } from "@/types";
 import { Archive, Edit, Filter, Loader2, Paperclip, Phone, Search, Send, Smile, Video } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
+import { cn } from '@/lib/utils';
 
 
-async function ChatMessage({ message, isCurrentUserSender, allUsers }: { message: Message, isCurrentUserSender: boolean, allUsers: UserProfile[] }) {
+function ChatMessage({ message, isCurrentUserSender, allUsers }: { message: Message, isCurrentUserSender: boolean, allUsers: UserProfile[] }) {
   const sender = allUsers.find(p => p.uid === message.senderId);
   if (!sender) return null;
 
@@ -34,7 +36,7 @@ async function ChatMessage({ message, isCurrentUserSender, allUsers }: { message
           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </p>
       </div>
-       {isCurrentUserSender && ( // Current user's avatar on the right
+       {isCurrentUserSender && ( 
          <Link href={`/profile/${sender.uid}`}>
            <Avatar className="h-8 w-8">
             <AvatarImage src={sender.profilePictureUrl} alt={sender.firstName} data-ai-hint="user avatar small"/>
@@ -56,8 +58,9 @@ export default function MessagingPage() {
   const [activeChatPartner, setActiveChatPartner] = useState<UserProfile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  const allMockProfiles = useMemo(() => mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString(), connectionsCount: p.connectionsCount || 0})), []);
+  const allMockProfiles = useMemo(() => mockUserProfiles.map(p => ({...p, uid: p.id, email: `${p.firstName.toLowerCase()}@example.com`, createdAt: new Date().toISOString(), connectionsCount: p.connectionsCount || 0, isActive: p.isActive})), []);
 
 
   useEffect(() => {
@@ -71,18 +74,16 @@ export default function MessagingPage() {
       if (currentUser) {
         setIsLoadingData(true);
         
-        // Filter conversations to only include connected users
         const connectedUserUIDs = currentUser.connections || [];
         const convos = allMockProfiles.filter(p => p.uid !== currentUser.uid && connectedUserUIDs.includes(p.uid));
         setConversations(convos);
 
         let targetUserId = chatWithUserId;
-        // If chatWithUserId is provided, check if they are a connection. If not, or if no chatWithUserId, pick first connection.
         if (targetUserId && !connectedUserUIDs.includes(targetUserId)) {
-            targetUserId = null; // User is trying to chat with non-connection, clear it.
+            targetUserId = null; 
         }
         if (!targetUserId && convos.length > 0) {
-            targetUserId = convos[0].uid; // Default to first connection
+            targetUserId = convos[0].uid; 
         }
 
 
@@ -108,6 +109,10 @@ export default function MessagingPage() {
     }
   }, [currentUser, loadingAuth, chatWithUserId, allMockProfiles]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
 
   if (loadingAuth || (!currentUser && !loadingAuth)) {
     return (
@@ -120,8 +125,7 @@ export default function MessagingPage() {
 
 
   return (
-    <div className="flex h-[calc(100vh-10rem)] border rounded-lg overflow-hidden"> {/* Adjust height as needed */}
-      {/* Conversation List Sidebar */}
+    <div className="flex h-[calc(100vh-10rem)] border rounded-lg overflow-hidden"> {}
       <aside className="w-1/3 border-r bg-muted/50">
         <div className="p-4 border-b">
           <div className="flex justify-between items-center mb-2">
@@ -136,7 +140,7 @@ export default function MessagingPage() {
             <Input type="search" placeholder="Search messages" className="pl-8 bg-background" />
           </div>
         </div>
-        <ScrollArea className="h-[calc(100%-8rem)]"> {/* Adjust height */}
+        <ScrollArea className="h-[calc(100%-8rem)]"> {}
           {isLoadingData ? (
              <div className="p-4 text-center"><Loader2 className="h-6 w-6 animate-spin text-primary mx-auto"/></div>
           ) : conversations.length === 0 ? (
@@ -145,15 +149,22 @@ export default function MessagingPage() {
           : conversations.map(user => (
             <Link href={`/messaging?chatWith=${user.uid}`} key={user.uid} className={`block p-3 hover:bg-accent/50 border-b ${user.uid === activeChatPartner?.uid ? 'bg-accent/60' : ''}`}>
               <div className="flex items-center space-x-3">
-                <Avatar>
-                  <AvatarImage src={user.profilePictureUrl} alt={user.firstName} data-ai-hint="user avatar"/>
-                  <AvatarFallback>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                    <Avatar>
+                    <AvatarImage src={user.profilePictureUrl} alt={user.firstName} data-ai-hint="user avatar"/>
+                    <AvatarFallback>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className={cn(
+                        "absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                        user.isActive ? "bg-green-500" : "bg-gray-400"
+                    )} />
+                </div>
                 <div>
                   <h3 className="font-medium">{user.firstName} {user.lastName}</h3>
                   <p className="text-sm text-muted-foreground truncate max-w-[150px] sm:max-w-[200px]">
-                    {/* Mock last message */}
-                    {messages.length > 0 && user.uid === activeChatPartner?.uid ? messages[messages.length - 1].content : `Start a conversation...`}
+                    {messages.length > 0 && user.uid === activeChatPartner?.uid && messages.find(m => m.senderId === user.uid || m.receiverId === user.uid) 
+                      ? messages.filter(m => m.senderId === user.uid || m.receiverId === user.uid).slice(-1)[0]?.content 
+                      : `Start a conversation...`}
                   </p>
                 </div>
               </div>
@@ -162,7 +173,6 @@ export default function MessagingPage() {
         </ScrollArea>
       </aside>
 
-      {/* Chat Area */}
       <section className="flex-grow flex flex-col bg-background">
         {isLoadingData && !activeChatPartner ? (
              <div className="flex-grow flex items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary"/></div>
@@ -170,13 +180,23 @@ export default function MessagingPage() {
           <>
             <header className="p-4 border-b flex justify-between items-center">
               <div className="flex items-center space-x-3">
-                <Avatar>
-                  <AvatarImage src={activeChatPartner.profilePictureUrl} alt={activeChatPartner.firstName} data-ai-hint="user avatar"/>
-                  <AvatarFallback>{activeChatPartner.firstName?.charAt(0)}{activeChatPartner.lastName?.charAt(0)}</AvatarFallback>
-                </Avatar>
+                 <div className="relative">
+                    <Avatar>
+                    <AvatarImage src={activeChatPartner.profilePictureUrl} alt={activeChatPartner.firstName} data-ai-hint="user avatar"/>
+                    <AvatarFallback>{activeChatPartner.firstName?.charAt(0)}{activeChatPartner.lastName?.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <span className={cn(
+                        "absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-background",
+                        activeChatPartner.isActive ? "bg-green-500" : "bg-gray-400"
+                    )} />
+                </div>
                 <div>
                   <h3 className="font-semibold">{activeChatPartner.firstName} {activeChatPartner.lastName}</h3>
-                  <p className="text-xs text-muted-foreground">{activeChatPartner.headline}</p>
+                  <div className="flex items-center text-xs text-muted-foreground">
+                    <p className="mr-2">{activeChatPartner.headline}</p>
+                    <span>•</span>
+                    <p className="ml-2">{activeChatPartner.isActive ? "Active now" : "Offline"}</p>
+                  </div>
                 </div>
               </div>
                <div className="flex space-x-2">
@@ -192,6 +212,7 @@ export default function MessagingPage() {
               ) : messages.map(msg => (
                 <ChatMessage key={msg.id} message={msg} isCurrentUserSender={msg.senderId === currentUser.uid} allUsers={allMockProfiles} />
               ))}
+              <div ref={messagesEndRef} />
             </ScrollArea>
 
             <footer className="p-4 border-t">
@@ -214,3 +235,4 @@ export default function MessagingPage() {
     </div>
   );
 }
+

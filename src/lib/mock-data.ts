@@ -34,6 +34,7 @@ export const mockUserProfiles: UserProfile[] = [
       { id: 's5', name: 'AWS', endorsements: 60 },
     ],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(), // 30 days ago
+    isActive: true,
   },
   {
     id: '2',
@@ -59,6 +60,7 @@ export const mockUserProfiles: UserProfile[] = [
       { id: 's7', name: 'Agile Methodologies', endorsements: 75 },
     ],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 60).toISOString(), // 60 days ago
+    isActive: false,
   },
   {
     id: '3',
@@ -75,6 +77,7 @@ export const mockUserProfiles: UserProfile[] = [
     connections: [],
     skills: [ {id: 's8', name: 'Figma', endorsements: 50}, {id: 's9', name: 'User Experience', endorsements: 65}],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(), // 10 days ago
+    isActive: true,
   },
   {
     id: '4',
@@ -91,6 +94,7 @@ export const mockUserProfiles: UserProfile[] = [
     connections: [],
     skills: [{id: 's10', name: 'Python', endorsements: 80}, {id: 's11', name: 'Machine Learning', endorsements: 70}],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(), // 5 days ago
+    isActive: false,
   },
   {
     id: '5',
@@ -107,6 +111,7 @@ export const mockUserProfiles: UserProfile[] = [
     connections: [],
     skills: [{id: 's12', name: 'SEO', endorsements: 60}, {id: 's13', name: 'Content Marketing', endorsements: 55}],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 90).toISOString(), // 90 days ago
+    isActive: true,
   }
 ];
 
@@ -148,5 +153,6 @@ export const getLearningCourses = async (): Promise<LearningCourse[]> => {
 export const getMessagesWithUser = async (userId: string): Promise<Message[]> => {
   await new Promise(resolve => setTimeout(resolve, 300));
   const currentMockUserId = 'mockuser1'; 
-  return mockMessages.filter(m => (m.senderId === userId && m.receiverId === currentMockUserId) || (m.senderId === currentMockUserId && m.receiverId === userId));
+  return mockMessages.filter(m => (m.senderId === userId && m.receiverId === currentMockUserId) || (m.senderId === currentMockUserId && m.receiverId === userId))
+    .sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()); // Sort messages chronologically
 }
