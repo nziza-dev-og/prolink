@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -7,13 +8,17 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getUserProfile } from "@/lib/user-service"; 
+import { getUserProfile, updateUserProfile } from "@/lib/user-service"; 
 import { getPostsByAuthorId } from "@/lib/post-service"; 
 import type { UserProfile, WorkExperience, Education, Skill, Post as PostType } from "@/types";
-import { Building, Edit, GraduationCap, Loader2, MessageSquare, Plus, Star, UserPlus } from "lucide-react";
+import { Building, Edit, GraduationCap, Loader2, MessageSquare, Plus, Star, UserPlus, Upload } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 import PostActions from '@/components/posts/post-actions'; 
 import CommentSection from '@/components/posts/comment-section';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { uploadFile } from '@/lib/storage-service';
 
 
 function ProfilePostCard({ post, onPostUpdated }: { post: PostType, onPostUpdated: (updatedPost: PostType) => void }) {
@@ -119,10 +124,22 @@ export default function UserProfilePage() {
   const userId = params.userId as string;
   const router = useRouter();
   
-  const { currentUser: loggedInUser, loadingAuth } = useAuth();
+  const { currentUser: loggedInUser, loadingAuth, refetchUserProfile } = useAuth();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [userPosts, setUserPosts] = useState<PostType[]>([]);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+
+  const [isEditingProfilePicture, setIsEditingProfilePicture] = useState(false);
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [profilePictureUrlInput, setProfilePictureUrlInput] = useState('');
+  const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
+  
+  const [isEditingCoverPhoto, setIsEditingCoverPhoto] = useState(false);
+  const [coverPhotoFile, setCoverPhotoFile] = useState<File | null>(null);
+  const [coverPhotoUrlInput, setCoverPhotoUrlInput] = useState('');
+  const [isUploadingCoverPhoto, setIsUploadingCoverPhoto] = useState(false);
+
 
   const fetchProfileAndPosts = useCallback(async () => {
     if (userId) {
@@ -130,18 +147,20 @@ export default function UserProfilePage() {
       try {
         const userProfileData = await getUserProfile(userId);
         setProfile(userProfileData);
-
         if (userProfileData) {
+          setProfilePictureUrlInput(userProfileData.profilePictureUrl || '');
+          setCoverPhotoUrlInput(userProfileData.coverPhotoUrl || '');
           const postsData = await getPostsByAuthorId(userId);
           setUserPosts(postsData);
         }
       } catch (error) {
         console.error("Failed to fetch profile data:", error);
+        toast({ title: "Error", description: "Could not load profile data.", variant: "destructive" });
       } finally {
         setIsLoadingProfile(false);
       }
     }
-  }, [userId]);
+  }, [userId, toast]);
 
 
   useEffect(() => {
@@ -158,6 +177,77 @@ export default function UserProfilePage() {
 
   const handlePostUpdated = (updatedPost: PostType) => {
     setUserPosts(prevPosts => prevPosts.map(p => p.id === updatedPost.id ? updatedPost : p));
+  };
+
+  const handleProfilePictureFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setProfilePictureFile(e.target.files[0]);
+      setProfilePictureUrlInput(''); // Clear URL input if file is selected
+    }
+  };
+
+  const handleCoverPhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCoverPhotoFile(e.target.files[0]);
+      setCoverPhotoUrlInput(''); 
+    }
+  };
+  
+  const handleUpdateProfilePicture = async () => {
+    if (!loggedInUser) return;
+    setIsUploadingProfilePicture(true);
+    let newProfilePictureUrl = profile?.profilePictureUrl;
+
+    try {
+      if (profilePictureFile) {
+        const filePath = `profilePictures/${loggedInUser.uid}/${profilePictureFile.name}`;
+        newProfilePictureUrl = await uploadFile(profilePictureFile, filePath);
+      } else if (profilePictureUrlInput.trim() !== '' && profilePictureUrlInput !== profile?.profilePictureUrl) {
+        newProfilePictureUrl = profilePictureUrlInput.trim();
+      }
+
+      if (newProfilePictureUrl !== profile?.profilePictureUrl) {
+         await updateUserProfile(loggedInUser.uid, { profilePictureUrl: newProfilePictureUrl });
+         await refetchUserProfile(); // Refetch context
+         await fetchProfileAndPosts(); // Refetch page data
+         toast({ title: "Profile Picture Updated" });
+      }
+      setIsEditingProfilePicture(false);
+      setProfilePictureFile(null);
+    } catch (error) {
+      console.error("Error updating profile picture:", error);
+      toast({ title: "Update Failed", description: "Could not update profile picture.", variant: "destructive" });
+    } finally {
+      setIsUploadingProfilePicture(false);
+    }
+  };
+
+  const handleUpdateCoverPhoto = async () => {
+    if (!loggedInUser) return;
+    setIsUploadingCoverPhoto(true);
+    let newCoverPhotoUrl = profile?.coverPhotoUrl;
+
+    try {
+      if (coverPhotoFile) {
+        const filePath = `coverPhotos/${loggedInUser.uid}/${coverPhotoFile.name}`;
+        newCoverPhotoUrl = await uploadFile(coverPhotoFile, filePath);
+      } else if (coverPhotoUrlInput.trim() !== '' && coverPhotoUrlInput !== profile?.coverPhotoUrl) {
+        newCoverPhotoUrl = coverPhotoUrlInput.trim();
+      }
+       if (newCoverPhotoUrl !== profile?.coverPhotoUrl) {
+         await updateUserProfile(loggedInUser.uid, { coverPhotoUrl: newCoverPhotoUrl });
+         await refetchUserProfile();
+         await fetchProfileAndPosts();
+         toast({ title: "Cover Photo Updated" });
+       }
+      setIsEditingCoverPhoto(false);
+      setCoverPhotoFile(null);
+    } catch (error) {
+      console.error("Error updating cover photo:", error);
+      toast({ title: "Update Failed", description: "Could not update cover photo.", variant: "destructive" });
+    } finally {
+      setIsUploadingCoverPhoto(false);
+    }
   };
 
 
@@ -178,17 +268,39 @@ export default function UserProfilePage() {
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden">
-        <div className="relative h-48 md:h-64 bg-muted">
+        <div className="relative h-48 md:h-64 bg-muted group">
           {profile.coverPhotoUrl && (
             <Image src={profile.coverPhotoUrl} alt={`${profile.firstName}'s cover photo`} layout="fill" objectFit="cover" data-ai-hint="profile cover background"/>
+          )}
+          {isCurrentUserProfile && (
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="absolute top-2 right-2 bg-card/70 hover:bg-card opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={() => setIsEditingCoverPhoto(true)}
+            >
+              <Upload className="h-5 w-5"/>
+            </Button>
           )}
         </div>
         <CardContent className="p-4 sm:p-6 relative">
           <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6">
-            <Avatar className="h-32 w-32 sm:h-40 sm:w-40 border-4 border-card rounded-full bg-card -mt-16 sm:-mt-20 flex-shrink-0">
-              <AvatarImage src={profile.profilePictureUrl} alt={profile.firstName} data-ai-hint="user avatar large"/>
-              <AvatarFallback className="text-5xl">{profile.firstName?.charAt(0)}{profile.lastName?.charAt(0)}</AvatarFallback>
-            </Avatar>
+            <div className="relative group">
+              <Avatar className="h-32 w-32 sm:h-40 sm:w-40 border-4 border-card rounded-full bg-card -mt-16 sm:-mt-20 flex-shrink-0">
+                <AvatarImage src={profile.profilePictureUrl} alt={profile.firstName || ''} data-ai-hint="user avatar large"/>
+                <AvatarFallback className="text-5xl">{profile.firstName?.charAt(0)}{profile.lastName?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              {isCurrentUserProfile && (
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="absolute bottom-0 right-0 sm:bottom-2 sm:right-2 bg-card/70 hover:bg-card opacity-0 group-hover:opacity-100 transition-opacity rounded-full h-8 w-8 sm:h-10 sm:w-10"
+                  onClick={() => setIsEditingProfilePicture(true)}
+                >
+                  <Upload className="h-4 w-4 sm:h-5 sm:w-5"/>
+                </Button>
+              )}
+            </div>
             <div className="mt-4 sm:mt-0 flex-grow">
               <h1 className="text-2xl sm:text-3xl font-bold">{profile.firstName} {profile.lastName}</h1>
               <p className="text-md text-foreground">{profile.headline}</p>
@@ -217,6 +329,101 @@ export default function UserProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Profile Picture Dialog */}
+      <Dialog open={isEditingProfilePicture} onOpenChange={setIsEditingProfilePicture}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Profile Picture</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label htmlFor="profilePictureUrlInput" className="text-sm font-medium">Image URL</label>
+              <Input 
+                id="profilePictureUrlInput" 
+                value={profilePictureUrlInput} 
+                onChange={(e) => { setProfilePictureUrlInput(e.target.value); setProfilePictureFile(null); }} 
+                placeholder="https://example.com/image.png" 
+                disabled={isUploadingProfilePicture}
+              />
+            </div>
+            <div className="text-center text-sm text-muted-foreground">OR</div>
+            <div>
+              <label htmlFor="profilePictureFileInput" className="text-sm font-medium">Upload File</label>
+              <Input 
+                id="profilePictureFileInput" 
+                type="file" 
+                accept="image/*" 
+                onChange={handleProfilePictureFileChange} 
+                disabled={isUploadingProfilePicture}
+                className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              />
+              {profilePictureFile && <p className="text-xs text-muted-foreground mt-1">Selected: {profilePictureFile.name}</p>}
+            </div>
+            {(profilePictureUrlInput || profilePictureFile) && profile?.profilePictureUrl !== (profilePictureFile ? URL.createObjectURL(profilePictureFile) : profilePictureUrlInput) && (
+              <div className="mt-2 border rounded-md p-2">
+                <p className="text-xs mb-1">Preview:</p>
+                 <Image src={profilePictureFile ? URL.createObjectURL(profilePictureFile) : profilePictureUrlInput} alt="Preview" width={100} height={100} className="rounded-full mx-auto" data-ai-hint="user avatar preview" />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline" disabled={isUploadingProfilePicture}>Cancel</Button></DialogClose>
+            <Button onClick={handleUpdateProfilePicture} disabled={isUploadingProfilePicture || (!profilePictureFile && !profilePictureUrlInput.trim())}>
+              {isUploadingProfilePicture && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Cover Photo Dialog */}
+      <Dialog open={isEditingCoverPhoto} onOpenChange={setIsEditingCoverPhoto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Cover Photo</DialogTitle>
+          </DialogHeader>
+           <div className="space-y-4 py-4">
+            <div>
+              <label htmlFor="coverPhotoUrlInput" className="text-sm font-medium">Image URL</label>
+              <Input 
+                id="coverPhotoUrlInput" 
+                value={coverPhotoUrlInput} 
+                onChange={(e) => { setCoverPhotoUrlInput(e.target.value); setCoverPhotoFile(null); }} 
+                placeholder="https://example.com/cover.png" 
+                disabled={isUploadingCoverPhoto}
+              />
+            </div>
+            <div className="text-center text-sm text-muted-foreground">OR</div>
+            <div>
+              <label htmlFor="coverPhotoFileInput" className="text-sm font-medium">Upload File</label>
+              <Input 
+                id="coverPhotoFileInput" 
+                type="file" 
+                accept="image/*" 
+                onChange={handleCoverPhotoFileChange} 
+                disabled={isUploadingCoverPhoto}
+                className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              />
+              {coverPhotoFile && <p className="text-xs text-muted-foreground mt-1">Selected: {coverPhotoFile.name}</p>}
+            </div>
+             {(coverPhotoUrlInput || coverPhotoFile) && profile?.coverPhotoUrl !== (coverPhotoFile ? URL.createObjectURL(coverPhotoFile) : coverPhotoUrlInput) && (
+              <div className="mt-2 border rounded-md p-2">
+                <p className="text-xs mb-1">Preview:</p>
+                 <Image src={coverPhotoFile ? URL.createObjectURL(coverPhotoFile) : coverPhotoUrlInput} alt="Preview" width={300} height={100} className="rounded-md mx-auto object-cover" data-ai-hint="cover photo preview"/>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline" disabled={isUploadingCoverPhoto}>Cancel</Button></DialogClose>
+            <Button onClick={handleUpdateCoverPhoto} disabled={isUploadingCoverPhoto || (!coverPhotoFile && !coverPhotoUrlInput.trim())}>
+              {isUploadingCoverPhoto && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {profile.summary && (
         <Card>

@@ -15,13 +15,16 @@ import {
   getDocs,
   Timestamp,
   where,
+  increment,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import type { Event, UserProfile } from '@/types';
 import { getUserProfile } from './user-service';
 
 // Create Event
 export async function createEvent(
-  eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt' | 'organizerInfo' | 'attendeesCount'>
+  eventData: Omit<Event, 'id' | 'createdAt' | 'updatedAt' | 'organizerInfo' | 'attendeesCount' | 'attendees'>
 ): Promise<string> {
   const eventsCollectionRef = collection(db, 'events');
   
@@ -54,6 +57,7 @@ export async function createEvent(
     dateTime: dateTimeToStore,
     organizerInfo,
     attendeesCount: 0,
+    attendees: [], // Initialize attendees array
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -73,6 +77,7 @@ export async function getEventById(eventId: string): Promise<Event | null> {
       dateTime: data.dateTime instanceof Timestamp ? data.dateTime.toDate().toISOString() : String(data.dateTime),
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : String(data.updatedAt),
+      attendees: data.attendees || [], // Ensure attendees array is present
     } as Event;
   } else {
     return null;
@@ -93,12 +98,13 @@ export async function getAllEvents(): Promise<Event[]> {
       dateTime: data.dateTime instanceof Timestamp ? data.dateTime.toDate().toISOString() : String(data.dateTime),
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : String(data.updatedAt),
+      attendees: data.attendees || [],
     } as Event;
   });
 }
 
 // Update Event
-export async function updateEvent(eventId: string, data: Partial<Omit<Event, 'id' | 'organizerId' | 'organizerInfo' | 'createdAt' | 'attendeesCount'>>): Promise<void> {
+export async function updateEvent(eventId: string, data: Partial<Omit<Event, 'id' | 'organizerId' | 'organizerInfo' | 'createdAt' | 'attendeesCount' | 'attendees'>>): Promise<void> {
   const eventRef = doc(db, 'events', eventId);
   const updateData: any = { ...data, updatedAt: serverTimestamp() };
 
@@ -130,10 +136,27 @@ export async function getEventsByOrganizer(organizerId: string): Promise<Event[]
       dateTime: data.dateTime instanceof Timestamp ? data.dateTime.toDate().toISOString() : String(data.dateTime),
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : String(data.updatedAt),
+      attendees: data.attendees || [],
     } as Event;
   });
 }
 
-// (Future: RSVP to Event - would likely involve updating attendeesCount and an attendees subcollection or array)
-// export async function rsvpToEvent(eventId: string, userId: string): Promise<void> { ... }
-// export async function cancelRsvpFromEvent(eventId: string, userId: string): Promise<void> { ... }
+// RSVP to Event
+export async function rsvpToEvent(eventId: string, userId: string): Promise<void> {
+  const eventRef = doc(db, 'events', eventId);
+  await updateDoc(eventRef, {
+    attendees: arrayUnion(userId),
+    attendeesCount: increment(1),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// Cancel RSVP from Event
+export async function cancelRsvpFromEvent(eventId: string, userId: string): Promise<void> {
+  const eventRef = doc(db, 'events', eventId);
+  await updateDoc(eventRef, {
+    attendees: arrayRemove(userId),
+    attendeesCount: increment(-1),
+    updatedAt: serverTimestamp(),
+  });
+}

@@ -174,7 +174,7 @@ export interface Event {
   category?: string; 
   tags?: string[];
   attendeesCount: number;
-  // attendees?: string[]; // Array of user UIDs - for large events, consider a subcollection
+  attendees?: string[]; // Array of user UIDs
   createdAt: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
