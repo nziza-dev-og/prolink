@@ -14,10 +14,11 @@ import {
   orderBy,
   Timestamp,
   where,
-  getDoc,
+  // getDoc, // No longer needed here as author profile fetched separately
   increment,
 } from 'firebase/firestore';
-import type { Post, Comment } from '@/types';
+import type { Post, Comment, UserProfile } from '@/types';
+import { getUserProfile } from './user-service'; // Import getUserProfile
 
 export async function createPost(
   postData: Omit<Post, 'id' | 'createdAt' | 'likesCount' | 'commentsCount' | 'repostsCount' | 'likes' | 'comments'>
@@ -38,28 +39,80 @@ export async function getPosts(): Promise<Post[]> {
   const postsCollectionRef = collection(db, 'posts');
   const q = query(postsCollectionRef, orderBy('createdAt', 'desc'));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    // Ensure 'id' is the Firestore document ID and 'createdAt' is a string.
-    return {
-      ...data, // Spread original data first
-      id: doc.id, // Override with Firestore document ID to ensure uniqueness
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
-    } as Post;
-  });
+
+  const postsWithAuthors = await Promise.all(
+    querySnapshot.docs.map(async (docSnapshot) => {
+      const data = docSnapshot.data();
+      let authorInfo: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl"> = {
+        id: data.authorId,
+        uid: data.authorId,
+        firstName: 'Unknown',
+        lastName: 'User',
+        headline: 'ProLink User',
+        profilePictureUrl: undefined,
+      };
+
+      if (data.authorId) {
+        const authorProfile = await getUserProfile(data.authorId);
+        if (authorProfile) {
+          authorInfo = {
+            id: authorProfile.id,
+            uid: authorProfile.uid,
+            firstName: authorProfile.firstName,
+            lastName: authorProfile.lastName,
+            headline: authorProfile.headline,
+            profilePictureUrl: authorProfile.profilePictureUrl,
+          };
+        }
+      }
+
+      return {
+        ...data,
+        id: docSnapshot.id,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
+        author: authorInfo,
+      } as Post;
+    })
+  );
+  return postsWithAuthors;
 }
 
 export async function getPostsByAuthorId(authorId: string): Promise<Post[]> {
   const postsCollectionRef = collection(db, 'posts');
   const q = query(postsCollectionRef, where('authorId', '==', authorId), orderBy('createdAt', 'desc'));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    // Ensure 'id' is the Firestore document ID and 'createdAt' is a string.
+
+  // Fetch the author's profile once, as it's the same for all these posts
+  const authorProfile = await getUserProfile(authorId);
+  let authorInfo: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
+
+  if (authorProfile) {
+    authorInfo = {
+      id: authorProfile.id,
+      uid: authorProfile.uid,
+      firstName: authorProfile.firstName,
+      lastName: authorProfile.lastName,
+      headline: authorProfile.headline,
+      profilePictureUrl: authorProfile.profilePictureUrl,
+    };
+  } else {
+    authorInfo = { // Fallback if profile not found (should ideally not happen)
+      id: authorId,
+      uid: authorId,
+      firstName: 'Unknown',
+      lastName: 'User',
+      headline: 'ProLink User',
+      profilePictureUrl: undefined,
+    };
+  }
+
+  return querySnapshot.docs.map((docSnapshot) => {
+    const data = docSnapshot.data();
     return {
-      ...data, // Spread original data first
-      id: doc.id, // Override with Firestore document ID to ensure uniqueness
+      ...data,
+      id: docSnapshot.id,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
+      author: authorInfo, // Use the pre-fetched authorInfo
     } as Post;
   });
 }
@@ -104,12 +157,40 @@ export async function getComments(postId: string): Promise<Comment[]> {
   const commentsCollectionRef = collection(db, 'posts', postId, 'comments');
   const q = query(commentsCollectionRef, orderBy('createdAt', 'asc'));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      ...data, // Spread original data first
-      id: doc.id, // Override with Firestore document ID to ensure uniqueness
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
-    } as Comment;
-  });
+  
+  const commentsWithAuthors = await Promise.all(
+    querySnapshot.docs.map(async (docSnapshot) => {
+      const data = docSnapshot.data();
+      let authorInfo: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl"> = {
+        id: data.authorId,
+        uid: data.authorId,
+        firstName: 'Unknown',
+        lastName: 'User',
+        headline: 'ProLink User',
+        profilePictureUrl: undefined,
+      };
+
+      if (data.authorId) {
+        const authorProfile = await getUserProfile(data.authorId);
+        if (authorProfile) {
+          authorInfo = {
+            id: authorProfile.id,
+            uid: authorProfile.uid,
+            firstName: authorProfile.firstName,
+            lastName: authorProfile.lastName,
+            headline: authorProfile.headline,
+            profilePictureUrl: authorProfile.profilePictureUrl,
+          };
+        }
+      }
+      
+      return {
+        ...data,
+        id: docSnapshot.id,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : String(data.createdAt),
+        author: authorInfo,
+      } as Comment;
+    })
+  );
+  return commentsWithAuthors;
 }
