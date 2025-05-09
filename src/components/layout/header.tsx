@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, Briefcase, Home, MessageSquareText, Search, Users, ChevronDown, LogOut, Settings, User as UserIcon, Loader2, ShieldCheck, CalendarDays } from 'lucide-react'; // Added CalendarDays
+import { Bell, Briefcase, Home, MessageSquareText, Search, Users, ChevronDown, LogOut, Settings, User as UserIcon, Loader2, ShieldCheck, CalendarDays } from 'lucide-react';
 import { ProLinkLogo } from '@/components/icons/prolink-logo';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,8 +22,9 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect, useState } from 'react';
-import { generateMockNotifications } from '@/lib/mock-data';
 import type { Notification } from '@/types';
+import { getAllUserNotifications } from '@/lib/notification-service';
+import { updateUserProfile } from '@/lib/user-service';
 
 
 const navItems = [
@@ -31,7 +32,7 @@ const navItems = [
   { href: '/network', label: 'My Network', icon: Users },
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/messaging', label: 'Messaging', icon: MessageSquareText },
-  { href: '/events', label: 'Events', icon: CalendarDays }, // Added Events
+  { href: '/events', label: 'Events', icon: CalendarDays },
   { href: '/notifications', label: 'Notifications', icon: Bell },
 ];
 
@@ -51,18 +52,29 @@ export default function Header() {
   }, [pathname]); 
 
   useEffect(() => {
-    if (currentUser) {
-      // Simulate fetching notifications and counting unread ones
-      const allNotifications = generateMockNotifications(currentUser.uid);
-      const unreadCount = allNotifications.filter(n => !n.isRead).length;
-      setUnreadNotificationsCount(unreadCount);
-    } else {
-      setUnreadNotificationsCount(0);
+    async function fetchNotificationsCount() {
+      if (currentUser) {
+        try {
+          const allNotifications = await getAllUserNotifications(currentUser.uid);
+          const unreadCount = allNotifications.filter(n => !n.isRead).length;
+          setUnreadNotificationsCount(unreadCount);
+        } catch (error) {
+          console.error("Failed to fetch notifications count:", error);
+          setUnreadNotificationsCount(0);
+        }
+      } else {
+        setUnreadNotificationsCount(0);
+      }
     }
-  }, [currentUser, pathname]); // Re-check on pathname change as well, in case navigation clears notifications
+    fetchNotificationsCount();
+  }, [currentUser, pathname]); 
 
   const handleSignOut = async () => {
     try {
+      if (currentUser) {
+        // Attempt to set user inactive before signing out
+        await updateUserProfile(currentUser.uid, { isActive: false });
+      }
       await signOut(auth);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('isAdmin');
@@ -95,7 +107,7 @@ export default function Header() {
           )}
         </div>
 
-        <nav className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 lg:space-x-4"> {/* Adjusted spacing */}
+        <nav className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 lg:space-x-4">
           {loadingAuth ? (
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           ) : currentUser ? (
@@ -122,9 +134,11 @@ export default function Header() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-auto p-1 flex flex-col items-center text-xs text-muted-foreground hover:text-foreground">
-                    <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
+                    <Avatar className="h-6 w-6 sm:h-7 sm:w-7 relative">
                       <AvatarImage src={currentUser.profilePictureUrl} alt={`${currentUser.firstName} ${currentUser.lastName}`} data-ai-hint="user avatar small"/>
                       <AvatarFallback>{currentUser.firstName?.charAt(0)}{currentUser.lastName?.charAt(0)}</AvatarFallback>
+                      {/* Current user is always active when logged in */}
+                       <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 ring-1 ring-card" />
                     </Avatar>
                     <div className='hidden sm:flex items-center'>
                       <span className="text-xs">Me</span>

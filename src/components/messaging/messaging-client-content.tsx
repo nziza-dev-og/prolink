@@ -92,7 +92,7 @@ export default function MessagingClientContent() {
     async function loadInitialData() {
       if (currentUser) {
         setIsLoadingData(true);
-        userProfilesCache.current.set(currentUser.uid, currentUser as UserProfile);
+        userProfilesCache.current.set(currentUser.uid, currentUser as UserProfile); // Cache current user's profile
         
         const connectedUserUIDs = currentUser.connections || [];
         const convosProfiles: UserProfile[] = [];
@@ -106,11 +106,11 @@ export default function MessagingClientContent() {
 
         let targetUserId = chatWithUserId;
         if (targetUserId) {
-            if (!connectedUserUIDs.includes(targetUserId) && !convosProfiles.some(p => p.uid === targetUserId)) {
-                // If chatWith user is not a connection, clear it.
-                // This can happen if URL is manually entered or connection was removed.
+            const isConnection = convosProfiles.some(p => p.uid === targetUserId);
+            if (!isConnection && currentUser.uid !== targetUserId) {
+                 // If chatWith user is not a connection and not self, clear it.
                 targetUserId = null; 
-                router.replace('/messaging', { scroll: false }); // Use replace to avoid back button going to invalid state
+                router.replace('/messaging', { scroll: false });
             } else {
                  setShowChatAreaMobile(true); 
             }
@@ -118,7 +118,7 @@ export default function MessagingClientContent() {
         
         if (!targetUserId && convosProfiles.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) { 
             targetUserId = convosProfiles[0].uid; 
-            router.replace(`/messaging?chatWith=${targetUserId}`, { scroll: false }); // Update URL for desktop auto-select
+            router.replace(`/messaging?chatWith=${targetUserId}`, { scroll: false });
         }
 
 
@@ -143,7 +143,7 @@ export default function MessagingClientContent() {
       loadInitialData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, loadingAuth, chatWithUserId]); // router was removed as it's stable
+  }, [currentUser, loadingAuth, chatWithUserId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -181,13 +181,12 @@ export default function MessagingClientContent() {
 
   const handleSelectConversation = (user: UserProfile) => {
     router.push(`/messaging?chatWith=${user.uid}`, { scroll: false }); 
-    // setActiveChatPartner will be updated by the useEffect watching chatWithUserId
     setShowChatAreaMobile(true); 
   };
 
   const handleBackToList = () => {
     setShowChatAreaMobile(false);
-    setActiveChatPartner(null); // Explicitly clear active partner for mobile view
+    setActiveChatPartner(null); 
     router.push('/messaging', { scroll: false }); 
   };
 
@@ -343,4 +342,3 @@ export default function MessagingClientContent() {
     </div>
   );
 }
-
