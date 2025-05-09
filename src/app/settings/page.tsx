@@ -1,20 +1,22 @@
 'use client';
 
 import type { UserProfile } from '@/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/context/auth-context';
 import { updateUserProfile } from '@/lib/user-service';
+import { uploadFile } from '@/lib/storage-service'; // New import
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // New import
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Camera } from 'lucide-react'; // Added Camera icon
 import { useRouter } from 'next/navigation';
 
 const profileFormSchema = z.object({
@@ -32,6 +34,10 @@ export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -59,6 +65,7 @@ export default function SettingsPage() {
         summary: currentUser.summary || '',
         location: currentUser.location || '',
       });
+      setImagePreviewUrl(currentUser.profilePictureUrl || null);
     }
   }, [currentUser, form]);
 
@@ -67,12 +74,48 @@ export default function SettingsPage() {
     setIsSubmittingProfile(true);
     try {
       await updateUserProfile(currentUser.uid, values);
-      await refetchUserProfile(); // Refetch to update context and UI
+      await refetchUserProfile();
       toast({ title: 'Profile Updated', description: 'Your profile information has been successfully updated.' });
     } catch (error: any) {
       toast({ title: 'Update Failed', description: error.message || 'Could not update profile.', variant: 'destructive' });
     } finally {
       setIsSubmittingProfile(false);
+    }
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setProfilePictureFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setProfilePictureFile(null);
+      setImagePreviewUrl(currentUser?.profilePictureUrl || null);
+    }
+  };
+
+  const handleUploadProfilePicture = async () => {
+    if (!currentUser || !profilePictureFile) {
+      toast({ title: 'No File Selected', description: 'Please select an image to upload.', variant: 'destructive'});
+      return;
+    }
+    setIsUploadingPicture(true);
+    try {
+      const filePath = `profilePictures/${currentUser.uid}/${profilePictureFile.name}`;
+      const downloadURL = await uploadFile(profilePictureFile, filePath);
+      await updateUserProfile(currentUser.uid, { profilePictureUrl: downloadURL });
+      await refetchUserProfile();
+      toast({ title: 'Profile Picture Updated', description: 'Your new profile picture is now live.' });
+      setProfilePictureFile(null); 
+      // imagePreviewUrl is already set to the new local URL or will be updated by refetchUserProfile
+    } catch (error: any) {
+      toast({ title: 'Upload Failed', description: error.message || 'Could not upload profile picture.', variant: 'destructive' });
+    } finally {
+      setIsUploadingPicture(false);
     }
   };
 
@@ -90,6 +133,48 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Profile Picture</CardTitle>
+          <CardDescription>Update your profile avatar.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-4">
+            <Avatar className="h-24 w-24">
+              <AvatarImage src={imagePreviewUrl || currentUser.profilePictureUrl} alt={currentUser.firstName} data-ai-hint="user avatar large"/>
+              <AvatarFallback className="text-3xl">
+                {currentUser.firstName?.charAt(0)}
+                {currentUser.lastName?.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col space-y-2">
+                <Label htmlFor="profilePictureInput" className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "cursor-pointer"
+                )}>
+                    <Camera className="mr-2 h-4 w-4" />
+                    Change Picture
+                </Label>
+                <Input 
+                    id="profilePictureInput" 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleFileChange} 
+                    className="hidden"
+                    disabled={isUploadingPicture}
+                />
+                {profilePictureFile && (
+                    <Button onClick={handleUploadProfilePicture} disabled={isUploadingPicture || !profilePictureFile}>
+                        {isUploadingPicture && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Upload & Save
+                    </Button>
+                )}
+            </div>
+          </div>
+           {profilePictureFile && <p className="text-sm text-muted-foreground">Selected: {profilePictureFile.name}</p>}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Profile Information</CardTitle>
           <CardDescription>Update your personal details.</CardDescription>
         </CardHeader>
@@ -104,7 +189,7 @@ export default function SettingsPage() {
                     <FormItem>
                       <FormLabel>First Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your first name" {...field} />
+                        <Input placeholder="Your first name" {...field} disabled={isSubmittingProfile} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -117,7 +202,7 @@ export default function SettingsPage() {
                     <FormItem>
                       <FormLabel>Last Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your last name" {...field} />
+                        <Input placeholder="Your last name" {...field} disabled={isSubmittingProfile} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -131,7 +216,7 @@ export default function SettingsPage() {
                   <FormItem>
                     <FormLabel>Headline</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Senior Software Engineer at TechCorp" {...field} />
+                      <Input placeholder="e.g., Senior Software Engineer at TechCorp" {...field} disabled={isSubmittingProfile} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -144,7 +229,7 @@ export default function SettingsPage() {
                   <FormItem>
                     <FormLabel>Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., San Francisco, CA" {...field} />
+                      <Input placeholder="e.g., San Francisco, CA" {...field} disabled={isSubmittingProfile}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -157,7 +242,7 @@ export default function SettingsPage() {
                   <FormItem>
                     <FormLabel>Summary</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Tell us about yourself" {...field} rows={5} />
+                      <Textarea placeholder="Tell us about yourself" {...field} rows={5} disabled={isSubmittingProfile}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -203,10 +288,8 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">Privacy controls are under development. (e.g., Profile visibility, Who can see your connections, etc.)</p>
-          {/* Example Toggle (non-functional) */}
           <div className="flex items-center justify-between mt-4 py-2 border-t">
             <Label htmlFor="profile-visibility">Profile Visibility</Label>
-            {/* <Switch id="profile-visibility" disabled /> */}
              <p className="text-xs text-muted-foreground">Currently Public</p>
           </div>
         </CardContent>
