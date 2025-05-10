@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export interface UserProfile {
@@ -98,6 +99,7 @@ export interface Job {
   companyLogoUrl?: string;
   skillsRequired?: string[];
   authorId: string; 
+  applicationsCount?: number;
 }
 
 export interface Message {
@@ -186,8 +188,8 @@ export interface Event {
 export interface JobApplication {
   id: string;
   jobId: string;
-  jobTitle: string; // Denormalized for easier display
-  companyName: string; // Denormalized
+  jobTitle: string; 
+  companyName: string; 
   applicantId: string;
   applicantName: string;
   applicantEmail: string;
@@ -196,4 +198,3 @@ export interface JobApplication {
   appliedDate: Timestamp | string;
   status: 'submitted' | 'reviewed' | 'interviewing' | 'rejected' | 'hired' | 'withdrawn';
 }
-```

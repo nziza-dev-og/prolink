@@ -27,7 +27,7 @@ const applicationFormSchema = z.object({
   coverLetter: z.string().min(50, 'Cover letter must be at least 50 characters.').max(5000),
 }).refine(data => data.resumeUrl || data.resumeFile, {
     message: "Either a resume URL or a resume file is required.",
-    path: ["resumeUrl"], // You can also use ["resumeFile"] or a more general path
+    path: ["resumeUrl"], 
 });
 
 type ApplicationFormValues = z.infer<typeof applicationFormSchema>;
@@ -139,8 +139,8 @@ export default function ApplyJobPage() {
 
       await createApplication(applicationPayload);
       toast({ title: "Application Submitted", description: `Your application for ${job.title} has been sent.` });
-      setHasApplied(true); // Update UI to reflect application
-      // Optionally redirect: router.push(`/jobs/${job.id}`); or to a confirmation page
+      setHasApplied(true); 
+      router.push(`/jobs/${job.id}`); 
     } catch (error) {
       console.error("Error submitting application:", error);
       toast({ title: "Submission Failed", description: "Could not submit your application. Please try again.", variant: "destructive" });
@@ -161,7 +161,7 @@ export default function ApplyJobPage() {
      return <div className="text-center py-10">Job details could not be loaded.</div>;
   }
 
-  if (hasApplied && !isSubmitting) { // Don't show "Already applied" if currently submitting (to allow success toast)
+  if (hasApplied && !isSubmitting) { 
     return (
         <div className="max-w-2xl mx-auto py-8 text-center">
             <Card>
@@ -222,7 +222,7 @@ export default function ApplyJobPage() {
                         onChange={(e) => {
                             if (e.target.files && e.target.files.length > 0) {
                                 onChange(e.target.files[0]);
-                                form.setValue('resumeUrl', ''); // Clear URL if file is selected
+                                form.setValue('resumeUrl', ''); 
                             }
                         }}
                         disabled={isSubmitting || !!form.watch('resumeUrl')}
@@ -258,4 +258,3 @@ export default function ApplyJobPage() {
     </div>
   );
 }
-```

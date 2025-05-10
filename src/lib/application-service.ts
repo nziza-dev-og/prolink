@@ -15,6 +15,7 @@ import {
   getDoc,
   orderBy, 
   updateDoc,
+  increment, // Added increment
 } from 'firebase/firestore';
 import type { JobApplication } from '@/types';
 
@@ -31,9 +32,13 @@ export async function createApplication(
 
   // Increment applicationsCount on the job
   const jobRef = doc(db, 'jobs', applicationData.jobId);
-  await updateDoc(jobRef, {
-    applicationsCount: increment(1)
-  });
+  const jobSnap = await getDoc(jobRef);
+  if (jobSnap.exists()) {
+      await updateDoc(jobRef, {
+        applicationsCount: increment(1)
+      });
+  }
+
 
   return docRef.id;
 }

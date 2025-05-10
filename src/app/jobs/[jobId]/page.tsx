@@ -85,6 +85,7 @@ export default function JobDetailPage() {
     return <div className="text-center py-10">Job not found. It might have been removed or the link is incorrect.</div>;
   }
 
+  const isJobPoster = currentUser?.uid === job.authorId;
 
   return (
     <div className="max-w-4xl mx-auto py-8 space-y-6">
@@ -110,7 +111,12 @@ export default function JobDetailPage() {
         </CardHeader>
         <CardContent>
             <div className="flex flex-col sm:flex-row gap-2 mb-6">
-                <Button asChild className="w-full sm:w-auto" disabled={hasApplied || currentUser?.uid === job.authorId}>
+                <Button 
+                  asChild 
+                  className="w-full sm:w-auto" 
+                  disabled={hasApplied || isJobPoster}
+                  title={isJobPoster ? "You cannot apply to your own job posting." : (hasApplied ? "You have already applied." : "Apply for this job")}
+                >
                   <Link href={`/jobs/${job.id}/apply`}>
                     {hasApplied ? <CheckCircle className="mr-2 h-4 w-4" /> : <ExternalLink className="mr-2 h-4 w-4" /> }
                     {hasApplied ? "Applied" : "Apply Now"}
