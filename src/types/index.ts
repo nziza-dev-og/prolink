@@ -1,4 +1,3 @@
-
 import type { Timestamp } from 'firebase/firestore';
 
 export interface UserProfile {
@@ -23,8 +22,8 @@ export interface UserProfile {
   lastLogin?: Timestamp | string; 
   isActive?: boolean; 
   pendingInvitationsCount?: number;
-  pendingInvitations?: string[]; // Could be array of invitation IDs or user IDs who sent them
-  suggestedConnections?: UserProfile[]; // For FoF, to avoid re-fetching in component
+  pendingInvitations?: string[]; 
+  suggestedConnections?: UserProfile[]; 
 }
 
 export interface WorkExperience {
@@ -74,18 +73,18 @@ export interface Post {
   repostsCount: number;
   isLikedByCurrentUser?: boolean; 
   likes: string[]; 
-  comments?: Comment[]; // Array of full Comment objects
+  comments?: Comment[]; 
   authorId: string; 
 }
 
 export interface Comment {
   id: string;
-  author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">; // Full author details for display
-  authorId: string; // Stored for querying
+  author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">; 
+  authorId: string; 
   content: string;
   createdAt: Timestamp | string; 
   likesCount: number;
-  isLikedByCurrentUser?: boolean; // Optional: for UI indication if current user liked this comment
+  isLikedByCurrentUser?: boolean; 
 }
 
 export interface Job {
@@ -123,16 +122,21 @@ export interface LearningCourse {
 export interface Notification {
   id: string;
   type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment" | "connection_accepted" | "admin_broadcast";
-  user?: {
+  recipientId?: string; // The user to whom this notification is addressed (for user-specific)
+  actorId?: string;     // ID of the user who performed the action (e.g., who liked a post, sent a message)
+  user?: {              // Populated details of the actorId (sender/performer of action)
     id: string;
     name: string;
     avatarUrl?: string;
   };
-  content: string;
-  timestamp: Date; 
+  entityId?: string;    // e.g., postId, userId (for profile view), jobId, messageThreadId
+  entityType?: 'post' | 'user' | 'job' | 'event' | 'message_thread'; // Type of the entity, useful for constructing links
+  content: string; // The main text of the notification
+  timestamp: Date; // Changed to Date for easier sorting and display
   isRead: boolean;
-  link?: string;
+  link?: string;    // URL to navigate to when notification is clicked
 }
+
 
 export interface Invitation {
     id: string;
@@ -149,7 +153,7 @@ export interface Article {
   authorId: string;
   author: Pick<UserProfile, "id" | "uid" | "firstName" | "lastName" | "headline" | "profilePictureUrl">;
   title: string;
-  content: string; // Could be Markdown or HTML
+  content: string; 
   coverImageUrl?: string;
   tags?: string[];
   status: 'draft' | 'published';
@@ -174,7 +178,7 @@ export interface Event {
   category?: string; 
   tags?: string[];
   attendeesCount: number;
-  attendees?: string[]; // Array of user UIDs
+  attendees?: string[]; 
   createdAt: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
