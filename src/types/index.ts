@@ -25,6 +25,7 @@ export interface UserProfile {
   pendingInvitationsCount?: number;
   pendingInvitations?: string[]; 
   suggestedConnections?: UserProfile[]; 
+  savedJobs?: string[]; // Added to store saved job IDs
 }
 
 export interface WorkExperience {
@@ -100,6 +101,7 @@ export interface Job {
   skillsRequired?: string[];
   authorId: string; 
   applicationsCount?: number;
+  savedBy?: string[]; // Added to track who saved the job
 }
 
 export interface Message {

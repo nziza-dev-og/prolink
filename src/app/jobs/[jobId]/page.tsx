@@ -9,10 +9,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getJobById } from '@/lib/job-service';
-import { getUserProfile } from '@/lib/user-service'; 
+import { getJobById, addUserIdToJobSavedBy, removeUserIdFromJobSavedBy } from '@/lib/job-service';
+import { getUserProfile, saveJobToProfile, unsaveJobFromProfile } from '@/lib/user-service'; 
 import type { Job, UserProfile } from "@/types";
-import { Briefcase, CalendarDays, ExternalLink, Loader2, MapPin, User, CheckCircle } from "lucide-react";
+import { Briefcase, CalendarDays, ExternalLink, Loader2, MapPin, User, CheckCircle, Bookmark, BookmarkCheck, BookmarkX } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { checkIfUserApplied } from '@/lib/application-service';
@@ -24,12 +24,14 @@ export default function JobDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
   
-  const { currentUser, loadingAuth } = useAuth();
+  const { currentUser, loadingAuth, refetchUserProfile } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
   const [jobPoster, setJobPoster] = useState<UserProfile | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [hasApplied, setHasApplied] = useState(false);
   const [checkingAppliedStatus, setCheckingAppliedStatus] = useState(true);
+  const [isJobSaved, setIsJobSaved] = useState(false);
+  const [isProcessingSave, setIsProcessingSave] = useState(false);
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -48,6 +50,9 @@ export default function JobDetailPage() {
             const posterData = await getUserProfile(jobData.authorId);
             setJobPoster(posterData);
           }
+          if (currentUser && jobData) {
+            setIsJobSaved(currentUser.savedJobs?.includes(jobData.id) || false);
+          }
         } catch (error) {
           console.error("Failed to fetch job data:", error);
           toast({ title: "Error", description: "Could not load job details.", variant: "destructive" });
@@ -56,7 +61,9 @@ export default function JobDetailPage() {
         }
       }
     }
-    if (!loadingAuth && currentUser) {
+    if (!loadingAuth && currentUser) { // currentUser check ensures savedJobs check can happen
+        fetchJobData();
+    } else if (!loadingAuth && !currentUser) { // If not logged in, still fetch basic job data
         fetchJobData();
     }
   }, [jobId, loadingAuth, currentUser, toast]);
@@ -72,6 +79,33 @@ export default function JobDetailPage() {
         .finally(() => setCheckingAppliedStatus(false));
     }
   }, [currentUser, jobId, loadingAuth]);
+
+  const handleSaveToggle = async () => {
+    if (!currentUser || !job) {
+      toast({ title: "Action Failed", description: "Please login to save jobs.", variant: "destructive"});
+      return;
+    }
+    setIsProcessingSave(true);
+    try {
+      if (isJobSaved) {
+        await unsaveJobFromProfile(currentUser.uid, job.id);
+        await removeUserIdFromJobSavedBy(job.id, currentUser.uid); // Also update job document
+        toast({ title: "Job Unsaved", description: `${job.title} removed from your saved jobs.` });
+        setIsJobSaved(false);
+      } else {
+        await saveJobToProfile(currentUser.uid, job.id);
+        await addUserIdToJobSavedBy(job.id, currentUser.uid); // Also update job document
+        toast({ title: "Job Saved!", description: `${job.title} added to your saved jobs.` });
+        setIsJobSaved(true);
+      }
+      await refetchUserProfile(); // Update auth context with new savedJobs list
+    } catch (error) {
+      console.error("Error toggling save job:", error);
+      toast({ title: "Error", description: "Could not update save status.", variant: "destructive" });
+    } finally {
+      setIsProcessingSave(false);
+    }
+  };
 
   if (loadingAuth || isLoadingData || checkingAppliedStatus) {
     return (
@@ -122,8 +156,17 @@ export default function JobDetailPage() {
                     {hasApplied ? "Applied" : "Apply Now"}
                   </Link>
                 </Button>
-                <Button variant="outline" className="w-full sm:w-auto" disabled>
-                    Save Job
+                <Button 
+                  variant="outline" 
+                  className="w-full sm:w-auto" 
+                  onClick={handleSaveToggle}
+                  disabled={isProcessingSave || isJobPoster}
+                  title={isJobPoster ? "You cannot save your own job posting." : (isJobSaved ? "Unsave this job" : "Save this job")}
+                >
+                  {isProcessingSave ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 
+                   isJobSaved ? <BookmarkCheck className="mr-2 h-4 w-4 text-primary" /> : <Bookmark className="mr-2 h-4 w-4" />
+                  }
+                  {isJobSaved ? "Saved" : "Save Job"}
                 </Button>
             </div>
 
@@ -158,7 +201,7 @@ export default function JobDetailPage() {
           <CardContent className="flex items-center space-x-4">
             <Link href={`/profile/${jobPoster.uid}`}>
                 <Avatar className="h-16 w-16">
-                <AvatarImage src={jobPoster.profilePictureUrl} alt={jobPoster.firstName} data-ai-hint="user avatar" />
+                <AvatarImage src={jobPoster.profilePictureUrl} alt={jobPoster.firstName || ''} data-ai-hint="user avatar" />
                 <AvatarFallback>{jobPoster.firstName?.charAt(0)}{jobPoster.lastName?.charAt(0)}</AvatarFallback>
                 </Avatar>
             </Link>

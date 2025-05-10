@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from './firebase';
@@ -11,16 +12,22 @@ import {
   query,
   orderBy,
   Timestamp,
+  updateDoc, // Added
+  arrayUnion, // Added
+  arrayRemove, // Added
+  increment, // Added
 } from 'firebase/firestore';
 import type { Job } from '@/types';
 
 export async function createJob(
-  jobData: Omit<Job, 'id' | 'postedDate'>
+  jobData: Omit<Job, 'id' | 'postedDate' | 'savedBy' | 'applicationsCount'>
 ): Promise<string> {
   const jobsCollectionRef = collection(db, 'jobs');
   const docRef = await addDoc(jobsCollectionRef, {
     ...jobData,
     postedDate: serverTimestamp(),
+    savedBy: [], // Initialize savedBy array
+    applicationsCount: 0, // Initialize applicationsCount
   });
   return docRef.id;
 }
@@ -36,6 +43,8 @@ export async function getAllJobs(): Promise<Job[]> {
       ...data, // Spread original data first
       id: doc.id, // Override with Firestore document ID to ensure uniqueness
       postedDate: data.postedDate instanceof Timestamp ? data.postedDate.toDate().toISOString() : String(data.postedDate),
+      savedBy: data.savedBy || [],
+      applicationsCount: data.applicationsCount || 0,
     } as Job;
   });
 }
@@ -51,8 +60,25 @@ export async function getJobById(jobId: string): Promise<Job | null> {
       ...data, // Spread original data first
       id: docSnap.id, // Override with Firestore document ID to ensure uniqueness
       postedDate: data.postedDate instanceof Timestamp ? data.postedDate.toDate().toISOString() : String(data.postedDate),
+      savedBy: data.savedBy || [],
+      applicationsCount: data.applicationsCount || 0,
     } as Job;
   } else {
     return null;
   }
+}
+
+// Functions to manage savedBy on the job document itself (optional, but good for querying jobs saved by a user)
+export async function addUserIdToJobSavedBy(jobId: string, userId: string): Promise<void> {
+  const jobRef = doc(db, 'jobs', jobId);
+  await updateDoc(jobRef, {
+    savedBy: arrayUnion(userId),
+  });
+}
+
+export async function removeUserIdFromJobSavedBy(jobId: string, userId: string): Promise<void> {
+  const jobRef = doc(db, 'jobs', jobId);
+  await updateDoc(jobRef, {
+    savedBy: arrayRemove(userId),
+  });
 }

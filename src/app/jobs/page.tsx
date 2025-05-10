@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -10,11 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAllJobs as fetchJobsFromService } from "@/lib/job-service"; 
 import type { Job } from "@/types";
-import { Bookmark, Briefcase, CheckCircle, ListFilter, Loader2, MapPin, Search, Settings2, StickyNote } from "lucide-react";
+import { Bookmark, Briefcase, CheckCircle, ListFilter, Loader2, MapPin, Search, Settings2, StickyNote, BookmarkCheck } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 
 
-function JobCard({ job }: { job: Job }) {
+function JobCard({ job, currentUserSavedJobs }: { job: Job, currentUserSavedJobs?: string[] }) {
+  const isSaved = currentUserSavedJobs?.includes(job.id) || false;
+  
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader className="flex flex-row space-x-4 items-start p-4">
@@ -31,8 +34,8 @@ function JobCard({ job }: { job: Job }) {
           </CardDescription>
           <p className="text-xs text-muted-foreground mt-1">Posted {new Date(job.postedDate as string).toLocaleDateString()}</p>
         </div>
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled> {/* Save job functionality to be implemented */}
-          <Bookmark className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" disabled title={isSaved ? "Job Saved" : "Save Job (disabled on list view)"}> 
+          {isSaved ? <BookmarkCheck className="h-5 w-5 text-primary" /> : <Bookmark className="h-5 w-5" />}
         </Button>
       </CardHeader>
       <CardContent className="px-4 pb-4">
@@ -165,7 +168,7 @@ export default function JobsPage() {
             {/* <p className="text-sm text-muted-foreground mb-4">Based on your profile and search history</p> */}
             <div className="space-y-4">
               {jobs.map((job) => (
-                <JobCard key={job.id} job={job} />
+                <JobCard key={job.id} job={job} currentUserSavedJobs={currentUser.savedJobs} />
               ))}
             </div>
           </div>

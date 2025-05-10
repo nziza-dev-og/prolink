@@ -25,7 +25,7 @@ import {
   documentId, 
 } from 'firebase/firestore';
 
-export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections' | 'pendingInvitationsCount' | 'pendingInvitations' | 'suggestedConnections' | 'isActive' | 'lastLogin' | 'updatedAt'>): Promise<void> {
+export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections' | 'pendingInvitationsCount' | 'pendingInvitations' | 'suggestedConnections' | 'isActive' | 'lastLogin' | 'updatedAt' | 'savedJobs'>): Promise<void> {
   const userRef = doc(db, 'users', userId);
   const defaultProfilePictureUrl = `https://picsum.photos/seed/${userId}/200/200`;
   const defaultCoverPhotoUrl = `https://picsum.photos/seed/${userId}cover/800/200`;
@@ -46,6 +46,7 @@ export async function createUserProfile(userId: string, data: Omit<UserProfile, 
     workExperience: data.workExperience || [],
     education: data.education || [],
     skills: data.skills || [],
+    savedJobs: [],
     isActive: true, // Set to true on creation
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -70,6 +71,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       connections: data.connections || [],
       pendingInvitationsCount: data.pendingInvitationsCount || (data.pendingInvitations?.length || 0),
       pendingInvitations: data.pendingInvitations || [],
+      savedJobs: data.savedJobs || [],
       isActive: data.isActive === undefined ? false : data.isActive, 
     };
 
@@ -464,10 +466,20 @@ export async function getUserProfileByLocation(location: string, currentUserId: 
   return profiles;
 }
 
-export async function getUserProfilesByLocation(location: string, currentUserId: string, resultLimit: number): Promise<UserProfile[]> {
-  // This is an alias for getUserProfileByLocation as requested by an earlier prompt.
-  // Keeping it to avoid breaking imports if it was referenced.
-  return getUserProfileByLocation(location, currentUserId, resultLimit);
+export async function saveJobToProfile(userId: string, jobId: string): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    savedJobs: arrayUnion(jobId),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function unsaveJobFromProfile(userId: string, jobId: string): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    savedJobs: arrayRemove(jobId),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 
