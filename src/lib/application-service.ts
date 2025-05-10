@@ -13,8 +13,10 @@ import {
   limit,
   doc,
   getDoc,
+  orderBy, 
+  updateDoc,
 } from 'firebase/firestore';
-import type { JobApplication, UserProfile, Job } from '@/types';
+import type { JobApplication } from '@/types';
 
 export async function createApplication(
   applicationData: Omit<JobApplication, 'id' | 'appliedDate' | 'status'>
@@ -26,6 +28,13 @@ export async function createApplication(
     status: 'submitted',
     appliedDate: serverTimestamp(),
   });
+
+  // Increment applicationsCount on the job
+  const jobRef = doc(db, 'jobs', applicationData.jobId);
+  await updateDoc(jobRef, {
+    applicationsCount: increment(1)
+  });
+
   return docRef.id;
 }
 
@@ -83,4 +92,3 @@ export async function getApplicationsByUserId(userId: string): Promise<JobApplic
         } as JobApplication;
     });
 }
-```
