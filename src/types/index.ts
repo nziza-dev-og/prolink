@@ -122,19 +122,19 @@ export interface LearningCourse {
 export interface Notification {
   id: string;
   type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment" | "connection_accepted" | "admin_broadcast";
-  recipientId?: string; // The user to whom this notification is addressed (for user-specific)
-  actorId?: string;     // ID of the user who performed the action (e.g., who liked a post, sent a message)
-  user?: {              // Populated details of the actorId (sender/performer of action)
+  recipientId?: string; 
+  actorId?: string;     
+  user?: {              
     id: string;
     name: string;
     avatarUrl?: string;
   };
-  entityId?: string;    // e.g., postId, userId (for profile view), jobId, messageThreadId
-  entityType?: 'post' | 'user' | 'job' | 'event' | 'message_thread'; // Type of the entity, useful for constructing links
-  content: string; // The main text of the notification
-  timestamp: Date; // Changed to Date for easier sorting and display
+  entityId?: string;    
+  entityType?: 'post' | 'user' | 'job' | 'event' | 'message_thread'; 
+  content: string; 
+  timestamp: Date; 
   isRead: boolean;
-  link?: string;    // URL to navigate to when notification is clicked
+  link?: string;    
 }
 
 
@@ -182,3 +182,18 @@ export interface Event {
   createdAt: Timestamp | string;
   updatedAt?: Timestamp | string;
 }
+
+export interface JobApplication {
+  id: string;
+  jobId: string;
+  jobTitle: string; // Denormalized for easier display
+  companyName: string; // Denormalized
+  applicantId: string;
+  applicantName: string;
+  applicantEmail: string;
+  resumeUrl: string;
+  coverLetter: string;
+  appliedDate: Timestamp | string;
+  status: 'submitted' | 'reviewed' | 'interviewing' | 'rejected' | 'hired' | 'withdrawn';
+}
+```

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,11 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getJobById } from '@/lib/job-service';
-import { getUserProfile } from '@/lib/user-service'; // To fetch poster details
+import { getUserProfile } from '@/lib/user-service'; 
 import type { Job, UserProfile } from "@/types";
-import { Briefcase, CalendarDays, ExternalLink, Loader2, MapPin, User } from "lucide-react";
+import { Briefcase, CalendarDays, ExternalLink, Loader2, MapPin, User, CheckCircle } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
+import { checkIfUserApplied } from '@/lib/application-service';
+
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -25,6 +28,8 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [jobPoster, setJobPoster] = useState<UserProfile | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [checkingAppliedStatus, setCheckingAppliedStatus] = useState(true);
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -56,7 +61,19 @@ export default function JobDetailPage() {
     }
   }, [jobId, loadingAuth, currentUser, toast]);
 
-  if (loadingAuth || isLoadingData) {
+  useEffect(() => {
+    if (currentUser && jobId && !loadingAuth) {
+      setCheckingAppliedStatus(true);
+      checkIfUserApplied(currentUser.uid, jobId)
+        .then(applied => {
+          setHasApplied(applied);
+        })
+        .catch(() => { /* silently fail or show subtle error */ })
+        .finally(() => setCheckingAppliedStatus(false));
+    }
+  }, [currentUser, jobId, loadingAuth]);
+
+  if (loadingAuth || isLoadingData || checkingAppliedStatus) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -68,11 +85,6 @@ export default function JobDetailPage() {
     return <div className="text-center py-10">Job not found. It might have been removed or the link is incorrect.</div>;
   }
 
-  const handleApply = () => {
-    // Placeholder for actual application logic
-    toast({ title: "Application Sent (Mock)", description: `You've "applied" for ${job.title} at ${job.companyName}.`});
-    // In a real app, this would likely open a form, redirect to an external site, or save application to Firestore.
-  };
 
   return (
     <div className="max-w-4xl mx-auto py-8 space-y-6">
@@ -98,8 +110,11 @@ export default function JobDetailPage() {
         </CardHeader>
         <CardContent>
             <div className="flex flex-col sm:flex-row gap-2 mb-6">
-                <Button onClick={handleApply} className="w-full sm:w-auto">
-                    <ExternalLink className="mr-2 h-4 w-4" /> Apply Now
+                <Button asChild className="w-full sm:w-auto" disabled={hasApplied || currentUser?.uid === job.authorId}>
+                  <Link href={`/jobs/${job.id}/apply`}>
+                    {hasApplied ? <CheckCircle className="mr-2 h-4 w-4" /> : <ExternalLink className="mr-2 h-4 w-4" /> }
+                    {hasApplied ? "Applied" : "Apply Now"}
+                  </Link>
                 </Button>
                 <Button variant="outline" className="w-full sm:w-auto" disabled>
                     Save Job
