@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -11,9 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAllJobs as fetchJobsFromService } from "@/lib/job-service"; 
 import type { Job } from "@/types";
-import { Bookmark, Briefcase, CheckCircle, ListFilter, Loader2, MapPin, Search, Settings2, StickyNote, BookmarkCheck } from "lucide-react";
+import { Bookmark, Briefcase, CheckCircle, ListFilter, Loader2, MapPin, Search, Settings2, StickyNote, BookmarkCheck, X } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
-
 
 function JobCard({ job, currentUserSavedJobs }: { job: Job, currentUserSavedJobs?: string[] }) {
   const isSaved = currentUserSavedJobs?.includes(job.id) || false;
@@ -60,7 +59,13 @@ export default function JobsPage() {
   const { currentUser, loadingAuth } = useAuth();
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [locationSearch, setLocationSearch] = useState('');
+  const [datePostedFilter, setDatePostedFilter] = useState('any');
+  const [experienceLevelFilter, setExperienceLevelFilter] = useState('any');
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -75,9 +80,9 @@ export default function JobsPage() {
         try {
           const jobsData = await fetchJobsFromService();
           setJobs(jobsData);
+          setFilteredJobs(jobsData); // Initialize filteredJobs with all jobs
         } catch (error) {
           console.error("Error fetching jobs:", error);
-          // Optionally show a toast or error message
         } finally {
           setIsLoadingJobs(false);
         }
@@ -88,6 +93,62 @@ export default function JobsPage() {
     }
   }, [currentUser, loadingAuth]);
 
+  useEffect(() => {
+    let tempJobs = [...jobs];
+
+    if (searchTerm.trim()) {
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        tempJobs = tempJobs.filter(job =>
+            job.title.toLowerCase().includes(lowerSearchTerm) ||
+            job.companyName.toLowerCase().includes(lowerSearchTerm) ||
+            (job.skillsRequired && job.skillsRequired.some(skill => skill.toLowerCase().includes(lowerSearchTerm))) ||
+            job.description.toLowerCase().includes(lowerSearchTerm)
+        );
+    }
+
+    if (locationSearch.trim()) {
+        const lowerLocationSearch = locationSearch.toLowerCase();
+        tempJobs = tempJobs.filter(job =>
+            job.location.toLowerCase().includes(lowerLocationSearch)
+        );
+    }
+
+    if (datePostedFilter !== 'any') {
+        const now = new Date();
+        let dateThreshold = new Date(now); // Create a new Date object to avoid modifying 'now'
+
+        switch (datePostedFilter) {
+            case 'past_24h':
+                dateThreshold.setDate(now.getDate() - 1);
+                break;
+            case 'past_week':
+                dateThreshold.setDate(now.getDate() - 7);
+                break;
+            case 'past_month':
+                dateThreshold.setDate(now.getDate() - 30);
+                break;
+        }
+        tempJobs = tempJobs.filter(job => {
+            const postedDate = new Date(job.postedDate as string);
+            return postedDate >= dateThreshold;
+        });
+    }
+    
+    // Note: Experience level filtering is not implemented as `Job` type doesn't have `experienceLevel`.
+    // if (experienceLevelFilter !== 'any' && job.experienceLevel) { // Example
+    //    tempJobs = tempJobs.filter(job => job.experienceLevel === experienceLevelFilter);
+    // }
+
+    setFilteredJobs(tempJobs);
+  }, [jobs, searchTerm, locationSearch, datePostedFilter, experienceLevelFilter]);
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setLocationSearch('');
+    setDatePostedFilter('any');
+    setExperienceLevelFilter('any');
+  };
+
   if (loadingAuth || (!currentUser && !loadingAuth)) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
@@ -96,6 +157,8 @@ export default function JobsPage() {
     );
   }
   if (!currentUser) return null;
+
+  const hasActiveFilters = searchTerm.trim() || locationSearch.trim() || datePostedFilter !== 'any' || experienceLevelFilter !== 'any';
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
@@ -127,33 +190,62 @@ export default function JobsPage() {
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-grow">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input type="search" placeholder="Search by title, skill, or company" className="pl-8" disabled />
+                <Input 
+                  type="search" 
+                  placeholder="Search by title, skill, or company" 
+                  className="pl-8" 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
               <div className="relative flex-grow">
                 <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input type="search" placeholder="City, state, or zip code" className="pl-8" disabled />
+                <Input 
+                  type="search" 
+                  placeholder="City, state, or zip code" 
+                  className="pl-8" 
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                />
               </div>
-              <Button className="w-full sm:w-auto" disabled>Search</Button>
+              {/* The Search button is less critical now with reactive filtering, but kept for UI consistency.
+                  It doesn't need an onClick if filtering is purely reactive.
+              */}
+              <Button className="w-full sm:w-auto">Search</Button>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" disabled><ListFilter className="mr-2 h-4 w-4" />All Filters</Button>
-                <Select defaultValue="any" disabled>
+                <Select value={datePostedFilter} onValueChange={setDatePostedFilter}>
                     <SelectTrigger className="w-auto h-9 text-sm">
                         <SelectValue placeholder="Date Posted" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="any">Any time</SelectItem>
+                        <SelectItem value="past_24h">Past 24 hours</SelectItem>
+                        <SelectItem value="past_week">Past week</SelectItem>
+                        <SelectItem value="past_month">Past month</SelectItem>
                     </SelectContent>
                 </Select>
-                <Select defaultValue="any" disabled>
+                <Select value={experienceLevelFilter} onValueChange={setExperienceLevelFilter}>
                     <SelectTrigger className="w-auto h-9 text-sm">
                         <SelectValue placeholder="Experience Level" />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="any">Any level</SelectItem>
+                        <SelectItem value="entry">Entry Level</SelectItem>
+                        <SelectItem value="mid">Mid Level</SelectItem>
+                        <SelectItem value="senior">Senior Level</SelectItem>
                     </SelectContent>
                 </Select>
-                 <Button variant="outline" size="sm" className="text-primary border-primary" disabled>Clear Filters</Button>
+                 <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={hasActiveFilters ? "text-primary border-primary hover:bg-primary/10" : ""}
+                    onClick={handleClearFilters}
+                    disabled={!hasActiveFilters}
+                 >
+                    <X className="mr-2 h-4 w-4" />Clear Filters
+                </Button>
             </div>
           </CardContent>
         </Card>
@@ -164,23 +256,35 @@ export default function JobsPage() {
             </div>
         ) : (
           <div>
-            <h2 className="text-xl font-semibold mb-4">Job Listings</h2>
-            {/* <p className="text-sm text-muted-foreground mb-4">Based on your profile and search history</p> */}
+            <div className="flex justify-between items-baseline mb-4">
+              <h2 className="text-xl font-semibold">Job Listings</h2>
+              {hasActiveFilters && <p className="text-sm text-muted-foreground">{filteredJobs.length} result(s)</p>}
+            </div>
             <div className="space-y-4">
-              {jobs.map((job) => (
+              {filteredJobs.map((job) => (
                 <JobCard key={job.id} job={job} currentUserSavedJobs={currentUser.savedJobs} />
               ))}
             </div>
           </div>
         )}
         
-        {!isLoadingJobs && jobs.length === 0 && <p className="text-center text-muted-foreground py-8">No jobs found.</p>}
+        {!isLoadingJobs && filteredJobs.length === 0 && (
+          <Card>
+            <CardContent className="p-10 text-center">
+              <p className="text-muted-foreground">
+                {hasActiveFilters ? "No jobs match your current filters." : "No jobs found."}
+              </p>
+              {hasActiveFilters && <Button variant="link" onClick={handleClearFilters} className="mt-2">Clear filters</Button>}
+            </CardContent>
+          </Card>
+        )}
 
-        {!isLoadingJobs && jobs.length > 0 && (
+        {/* Load more functionality can be added later */}
+        {/* {!isLoadingJobs && filteredJobs.length > 0 && (
           <div className="text-center mt-8">
             <Button variant="outline" disabled>Load more jobs</Button>
           </div>
-        )}
+        )} */}
       </section>
     </div>
   );
