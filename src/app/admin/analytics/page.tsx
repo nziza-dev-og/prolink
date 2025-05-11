@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,7 +9,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { LineChart as ReLineChart, CartesianGrid, XAxis, YAxis, Tooltip as ReTooltip, ResponsiveContainer, Bar, BarChart as ReBarChart } from "recharts";
+import { LineChart as ReLineChart, CartesianGrid, XAxis, YAxis, Tooltip as ReTooltip, ResponsiveContainer, Bar, BarChart as ReBarChart, Line as RechartsLine } from "recharts";
 
 
 const lineChartConfig = {
@@ -22,22 +21,22 @@ const barChartConfig = {
 } satisfies ChartConfig;
 
 const mockLineData = [
-  { date: "2024-01", value: Math.floor(Math.random() * 100) + 50 },
-  { date: "2024-02", value: Math.floor(Math.random() * 100) + 70 },
-  { date: "2024-03", value: Math.floor(Math.random() * 100) + 90 },
-  { date: "2024-04", value: Math.floor(Math.random() * 100) + 120 },
-  { date: "2024-05", value: Math.floor(Math.random() * 100) + 150 },
-  { date: "2024-06", value: Math.floor(Math.random() * 100) + 130 },
+  { date: "2024-01", value: 80 },
+  { date: "2024-02", value: 120 },
+  { date: "2024-03", value: 90 },
+  { date: "2024-04", value: 150 },
+  { date: "2024-05", value: 170 },
+  { date: "2024-06", value: 140 },
 ];
 
 const mockBarData = [
-  { name: "Posts", count: Math.floor(Math.random() * 200) + 50 },
-  { name: "Articles", count: Math.floor(Math.random() * 100) + 20 },
-  { name: "Events", count: Math.floor(Math.random() * 50) + 10 },
-  { name: "Comments", count: Math.floor(Math.random() * 500) + 100 },
+  { name: "Posts", count: 150 },
+  { name: "Articles", count: 70 },
+  { name: "Events", count: 30 },
+  { name: "Comments", count: 300 },
 ];
 
-const PlaceholderChart = ({ title, type = 'line' }: { title: string, type?: 'line' | 'bar' }) => (
+const PlaceholderChart = ({ title, type = 'line' | 'bar' }: { title: string, type?: 'line' | 'bar' }) => (
   <Card className="shadow-md">
     <CardHeader><CardTitle className="text-lg">{title}</CardTitle></CardHeader>
     <CardContent className="h-72 -ml-4">
@@ -49,7 +48,7 @@ const PlaceholderChart = ({ title, type = 'line' }: { title: string, type?: 'lin
               <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
               <YAxis tickLine={false} axisLine={false} tickMargin={8}/>
               <ReTooltip content={<ChartTooltipContent indicator="dot" hideLabel />} />
-              <Line dataKey="value" type="monotone" stroke="var(--color-value)" strokeWidth={2} dot={true} />
+              <RechartsLine dataKey="value" type="monotone" stroke="var(--color-value)" strokeWidth={2} dot={true} />
             </ReLineChart>
           </ResponsiveContainer>
         </ChartContainer>
