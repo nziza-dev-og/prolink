@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronLeft, Briefcase, Lightbulb, CheckCircle, TrendingUp } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 const availableAssessments = [
   { id: "pm_fundamentals", name: "Project Management Fundamentals", status: "Available", icon: <CheckCircle className="h-5 w-5 text-green-500" /> },
@@ -16,6 +17,15 @@ const availableAssessments = [
 
 
 export default function BusinessSkillsAssessmentPage() {
+  const { toast } = useToast();
+
+  const handleStartAssessment = (assessmentName: string) => {
+    toast({
+      title: "Assessment Starting",
+      description: `The "${assessmentName}" assessment will begin shortly. (This feature is currently a placeholder).`,
+    });
+  };
+
   return (
     <div className="container mx-auto py-8 max-w-3xl">
       <Card className="shadow-lg">
@@ -64,6 +74,7 @@ export default function BusinessSkillsAssessmentPage() {
                         variant={assessment.status === "Available" ? "default" : "outline"} 
                         size="sm" 
                         className="w-full"
+                        onClick={assessment.status === "Available" ? () => handleStartAssessment(assessment.name) : undefined}
                         disabled={assessment.status !== "Available"}
                       >
                         {assessment.status === "Available" ? "Start Assessment" : "Coming Soon"}
