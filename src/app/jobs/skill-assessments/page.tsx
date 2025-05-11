@@ -2,7 +2,7 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Award, BarChart3, CheckSquare, FileText, Lightbulb, ListChecks, ChevronLeft } from "lucide-react"; // Added new icons
+import { Award, BarChart3, CheckSquare, FileText, Lightbulb, ListChecks, ChevronLeft, Terminal, Briefcase, Palette } from "lucide-react"; // Added new icons
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -29,34 +29,40 @@ export default function SkillAssessmentsPage() {
           <section>
             <h2 className="text-xl font-semibold mb-4">Available Assessment Categories</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="opacity-70 hover:shadow-md transition-shadow">
+              <Card className="hover:shadow-md transition-shadow">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center"><FileText className="mr-2 h-5 w-5 text-blue-500"/>Technical Skills</CardTitle>
+                  <CardTitle className="text-lg flex items-center"><Terminal className="mr-2 h-5 w-5 text-blue-500"/>Technical Skills</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-3">Assessments for programming languages, frameworks, and tools.</p>
                   <p className="text-xs text-amber-600 mb-3">(Coming Soon)</p>
-                  <Button variant="outline" size="sm" className="w-full" disabled>View Technical Assessments</Button>
+                  <Button variant="outline" size="sm" className="w-full" asChild>
+                    <Link href="/jobs/skill-assessments/technical">View Technical Assessments</Link>
+                  </Button>
                 </CardContent>
               </Card>
-              <Card className="opacity-70 hover:shadow-md transition-shadow">
+              <Card className="hover:shadow-md transition-shadow">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center"><CheckSquare className="mr-2 h-5 w-5 text-green-500"/>Business Skills</CardTitle>
+                  <CardTitle className="text-lg flex items-center"><Briefcase className="mr-2 h-5 w-5 text-green-500"/>Business Skills</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-3">Test your knowledge in areas like project management and marketing.</p>
                   <p className="text-xs text-amber-600 mb-3">(Coming Soon)</p>
-                   <Button variant="outline" size="sm" className="w-full" disabled>View Business Assessments</Button>
+                   <Button variant="outline" size="sm" className="w-full" asChild>
+                    <Link href="/jobs/skill-assessments/business">View Business Assessments</Link>
+                   </Button>
                 </CardContent>
               </Card>
-               <Card className="opacity-70 hover:shadow-md transition-shadow md:col-span-2">
+               <Card className="hover:shadow-md transition-shadow md:col-span-2">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center"><BarChart3 className="mr-2 h-5 w-5 text-purple-500"/>Design Skills</CardTitle>
+                  <CardTitle className="text-lg flex items-center"><Palette className="mr-2 h-5 w-5 text-purple-500"/>Design Skills</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-3">Showcase your proficiency in design software and principles.</p>
                   <p className="text-xs text-amber-600 mb-3">(Coming Soon)</p>
-                  <Button variant="outline" size="sm" className="w-full" disabled>View Design Assessments</Button>
+                  <Button variant="outline" size="sm" className="w-full" asChild>
+                    <Link href="/jobs/skill-assessments/design">View Design Assessments</Link>
+                  </Button>
                 </CardContent>
               </Card>
             </div>
