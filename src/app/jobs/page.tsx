@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAllJobs as fetchJobsFromService } from "@/lib/job-service";
 import type { Job } from "@/types";
-import { Bookmark, Briefcase, CheckCircle, ListFilter, Loader2, MapPin, Search, Settings2, DollarSign, Users, Clock, CalendarCheck, ExternalLink, Award, ClipboardList, Building, GraduationCap, Layers, Filter, SlidersHorizontal } from "lucide-react";
+import { Bookmark, Briefcase, CheckCircle, ListFilter, Loader2, MapPin, Search, Settings2, DollarSign, Users, Clock, CalendarCheck, ExternalLink, Award, ClipboardList, Building, GraduationCap, Layers, Filter, SlidersHorizontal, BookmarkCheck } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict, format } from 'date-fns';
@@ -90,6 +90,11 @@ function JobCardNew({ job, currentUserSavedJobs }: { job: Job, currentUserSavedJ
 }
 
 const popularSearches = ["Developers", "Data mining", "Product designer"];
+const ALL_LOCATIONS_VALUE = "all_locations";
+const ALL_JOB_TYPES_VALUE = "All";
+const ALL_INDUSTRIES_VALUE = "All";
+const ANY_EXPERIENCE_VALUE = "any";
+
 
 export default function JobsPage() {
   const { currentUser, loadingAuth } = useAuth();
@@ -99,10 +104,10 @@ export default function JobsPage() {
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [locationSearch, setLocationSearch] = useState('');
-  const [jobTypeFilter, setJobTypeFilter] = useState('Fulltime');
-  const [industryFilter, setIndustryFilter] = useState('Technology');
-  const [experienceFilter, setExperienceFilter] = useState('1-2years');
+  const [locationSearch, setLocationSearch] = useState(ALL_LOCATIONS_VALUE);
+  const [jobTypeFilter, setJobTypeFilter] = useState(ALL_JOB_TYPES_VALUE);
+  const [industryFilter, setIndustryFilter] = useState('Technology'); // Default to Technology
+  const [experienceFilter, setExperienceFilter] = useState(ANY_EXPERIENCE_VALUE);
   const [sortBy, setSortBy] = useState('Newest');
 
   useEffect(() => {
@@ -118,7 +123,7 @@ export default function JobsPage() {
         try {
           const jobsData = await fetchJobsFromService();
           setJobs(jobsData);
-          setFilteredJobs(jobsData);
+          setFilteredJobs(jobsData); // Initialize filteredJobs with all jobs
         } catch (error) {
           console.error("Error fetching jobs:", error);
         } finally {
@@ -144,26 +149,42 @@ export default function JobsPage() {
       );
     }
 
-    if (locationSearch.trim()) {
+    if (locationSearch.trim() && locationSearch !== ALL_LOCATIONS_VALUE) {
       const lowerLocationSearch = locationSearch.toLowerCase();
       tempJobs = tempJobs.filter(job =>
         job.location.toLowerCase().includes(lowerLocationSearch)
       );
     }
     
-    if (jobTypeFilter !== 'All') {
+    if (jobTypeFilter !== ALL_JOB_TYPES_VALUE) {
         tempJobs = tempJobs.filter(job => job.employmentType === jobTypeFilter);
     }
 
     // Placeholder for industry and experience filtering as data is not available in Job type
-    // if (industryFilter !== 'All') { /* filter logic */ }
-    // if (experienceFilter !== 'All') { /* filter logic */ }
+    // For industry, we'll assume it's a direct match if the filter isn't "All".
+    // This would need a proper 'industry' field in the Job type and data.
+    if (industryFilter !== ALL_INDUSTRIES_VALUE) {
+       // tempJobs = tempJobs.filter(job => job.industry?.toLowerCase() === industryFilter.toLowerCase()); // Example
+    }
+    
+    // Placeholder for experience filtering
+    if (experienceFilter !== ANY_EXPERIENCE_VALUE) {
+        // Example: map experienceFilter value ("0-1years") to a range and filter
+        // tempJobs = tempJobs.filter(job => checkExperienceMatch(job, experienceFilter));
+    }
 
-    // Sorting (example for Newest)
+
+    // Sorting
     if (sortBy === 'Newest') {
         tempJobs.sort((a, b) => new Date(b.postedDate as string).getTime() - new Date(a.postedDate as string).getTime());
+    } else if (sortBy === 'Relevant') {
+        // Placeholder for relevance sorting, could be based on match score with search/filters
+    } else if (sortBy === 'SalaryHigh') {
+        // Placeholder: tempJobs.sort((a,b) => (b.salaryMax || 0) - (a.salaryMin || 0));
+    } else if (sortBy === 'SalaryLow') {
+        // Placeholder: tempJobs.sort((a,b) => (a.salaryMin || Infinity) - (b.salaryMax || Infinity));
     }
-    // Add other sort options here
+
 
     setFilteredJobs(tempJobs);
   }, [jobs, searchTerm, locationSearch, jobTypeFilter, industryFilter, experienceFilter, sortBy]);
@@ -203,12 +224,16 @@ export default function JobsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
             <div>
                 <Select value={locationSearch} onValueChange={setLocationSearch}>
-                    <SelectTrigger className="h-10 text-sm"><MapPin className="h-4 w-4 mr-2 text-muted-foreground"/>Location: {locationSearch || 'All'}</SelectTrigger>
+                    <SelectTrigger className="h-10 text-sm">
+                        <MapPin className="h-4 w-4 mr-2 text-muted-foreground"/>
+                        Location: {locationSearch === ALL_LOCATIONS_VALUE ? 'All' : locationSearch}
+                    </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">All</SelectItem>
+                        <SelectItem value={ALL_LOCATIONS_VALUE}>All</SelectItem>
                         <SelectItem value="USA">USA</SelectItem>
                         <SelectItem value="Remote">Remote</SelectItem>
-                        {/* Add more locations */}
+                        <SelectItem value="New York, NY">New York, NY</SelectItem>
+                        <SelectItem value="San Francisco, CA">San Francisco, CA</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -216,7 +241,7 @@ export default function JobsPage() {
                 <Select value={jobTypeFilter} onValueChange={setJobTypeFilter}>
                     <SelectTrigger className="h-10 text-sm"><Briefcase className="h-4 w-4 mr-2 text-muted-foreground"/>Job Type: {jobTypeFilter}</SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="All">All Types</SelectItem>
+                        <SelectItem value={ALL_JOB_TYPES_VALUE}>All Types</SelectItem>
                         <SelectItem value="Full-time">Full-time</SelectItem>
                         <SelectItem value="Part-time">Part-time</SelectItem>
                         <SelectItem value="Contract">Contract</SelectItem>
@@ -226,20 +251,22 @@ export default function JobsPage() {
             </div>
              <div>
                 <Select value={industryFilter} onValueChange={setIndustryFilter}>
-                    <SelectTrigger className="h-10 text-sm"><Layers className="h-4 w-4 mr-2 text-muted-foreground"/>Industry: {industryFilter}</SelectTrigger>
+                    <SelectTrigger className="h-10 text-sm"><Layers className="h-4 w-4 mr-2 text-muted-foreground"/>Industry: {industryFilter === ALL_INDUSTRIES_VALUE ? 'All' : industryFilter}</SelectTrigger>
                     <SelectContent>
+                        <SelectItem value={ALL_INDUSTRIES_VALUE}>All Industries</SelectItem>
                         <SelectItem value="Technology">Technology</SelectItem>
                         <SelectItem value="Finance">Finance</SelectItem>
                         <SelectItem value="Healthcare">Healthcare</SelectItem>
+                        <SelectItem value="Marketing">Marketing</SelectItem>
                          {/* Add more industries */}
                     </SelectContent>
                 </Select>
             </div>
              <div>
                 <Select value={experienceFilter} onValueChange={setExperienceFilter}>
-                    <SelectTrigger className="h-10 text-sm"><Award className="h-4 w-4 mr-2 text-muted-foreground"/>Experience: {experienceFilter.replace('-', ' ')}</SelectTrigger>
+                    <SelectTrigger className="h-10 text-sm"><Award className="h-4 w-4 mr-2 text-muted-foreground"/>Experience: {experienceFilter === ANY_EXPERIENCE_VALUE ? 'Any' : experienceFilter.replace('-', ' ')}</SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="any">Any</SelectItem>
+                        <SelectItem value={ANY_EXPERIENCE_VALUE}>Any</SelectItem>
                         <SelectItem value="0-1years">0-1 years</SelectItem>
                         <SelectItem value="1-2years">1-2 years</SelectItem>
                         <SelectItem value="3-5years">3-5 years</SelectItem>
