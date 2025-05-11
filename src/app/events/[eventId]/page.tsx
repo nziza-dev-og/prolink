@@ -91,7 +91,10 @@ export default function EventDetailPage() {
   };
 
   const handleDeleteEvent = async () => {
-    if (!event) return;
+    if (!event || !currentUser || event.organizerId !== currentUser.uid) {
+        toast({ title: "Unauthorized", description: "You cannot delete this event.", variant: "destructive" });
+        return;
+    }
     setIsProcessingDelete(true);
     try {
       await deleteEventService(event.id);
@@ -131,7 +134,6 @@ export default function EventDetailPage() {
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
           {event.title}
         </h1>
-        {/* Consider adding a short description field to EventType or using part of event.description */}
         <p className="mt-3 max-w-2xl mx-auto text-lg text-muted-foreground">
           Join us for an exciting event: {event.category ? `${event.category}.` : ''} {event.isOnline ? "Online." : `At ${event.location}.`}
         </p>
@@ -201,7 +203,6 @@ export default function EventDetailPage() {
               <div className="my-6 rounded-lg overflow-hidden shadow-md">
                 <Image src="https://picsum.photos/seed/eventcontent2/800/400" alt="Illustrative image for event content" width={800} height={400} className="w-full h-auto object-cover" data-ai-hint="event meeting"/>
               </div>
-              {/* You can add more structured content here if event.description supports it (e.g., Markdown rendering) */}
             </CardContent>
           </Card>
 

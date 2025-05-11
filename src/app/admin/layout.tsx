@@ -76,6 +76,7 @@ function AdminSidebar() {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const router = useRouter();
+  const pathname = usePathname(); // Get current path
   const { loadingAuth } = useAuth();
   const [isAdminVerified, setIsAdminVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
@@ -87,11 +88,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       if (isAdmin === 'true') {
         setIsAdminVerified(true);
       } else {
-        router.push('/admin/login');
+        // Only redirect if not already on the login page
+        if (pathname !== '/admin/login') { 
+          router.push('/admin/login');
+        }
       }
       setIsVerifying(false);
     }
-  }, [router]);
+  }, [router, pathname]); // Add pathname to dependency array
 
   if (isVerifying || loadingAuth) {
     return (
@@ -101,22 +105,33 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   }
 
-  if (!isAdminVerified) {
-    // Redirect is handled in useEffect, this is a fallback or for SSR safety.
-    // It might be better to return null or a minimal loading state if redirect is certain.
+  // If on the login page and not verified, let the login page render itself.
+  // Otherwise, if not verified and not on login page, this part might still be reached briefly before redirect.
+  // The main protection is the redirect in useEffect.
+  if (!isAdminVerified && pathname !== '/admin/login') {
     return (
         <div className="flex justify-center items-center min-h-screen bg-background">
             <p>Redirecting to login...</p>
         </div>
     );
   }
+  
+  // If it's the login page, or if admin is verified, render the content
+  if (pathname === '/admin/login' || isAdminVerified) {
+    return (
+      <div className="flex min-h-screen bg-background">
+        {pathname !== '/admin/login' && <AdminSidebar />} {/* Show sidebar only if not login page */}
+        <main className="flex-grow p-6 lg:p-8 overflow-auto">
+          {children}
+        </main>
+      </div>
+    );
+  }
 
+  // Fallback for any other case (should ideally not be reached if logic is correct)
   return (
-    <div className="flex min-h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-grow p-6 lg:p-8 overflow-auto">
-        {children}
-      </main>
+    <div className="flex justify-center items-center min-h-screen bg-background">
+        <p>Verifying admin status...</p>
     </div>
   );
 }
