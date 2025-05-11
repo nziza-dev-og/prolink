@@ -160,3 +160,9 @@ export async function cancelRsvpFromEvent(eventId: string, userId: string): Prom
     updatedAt: serverTimestamp(),
   });
 }
+
+export async function getTotalEventsCount(): Promise<number> {
+  const eventsCollectionRef = collection(db, 'events');
+  const querySnapshot = await getDocs(eventsCollectionRef);
+  return querySnapshot.size;
+}

@@ -109,3 +109,10 @@ export async function getAllArticles(): Promise<Article[]> {
     } as Article;
   });
 }
+
+export async function getTotalArticlesCount(): Promise<number> {
+  const articlesCollectionRef = collection(db, 'articles');
+  // const q = query(articlesCollectionRef, where('status', '==', 'published')); // If only published
+  const querySnapshot = await getDocs(articlesCollectionRef);
+  return querySnapshot.size;
+}

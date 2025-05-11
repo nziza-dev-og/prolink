@@ -9,11 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users, FileText, BarChart2, Bell, Settings as SettingsIcon, LogOut, Eye, Trash2, LineChart, ListChecks, ThumbsUp, MessageCircle } from 'lucide-react';
+import { Loader2, Users, FileText, BarChart2, Bell, Settings as SettingsIcon, LogOut, Eye, Trash2, LineChart, ListChecks, ThumbsUp, MessageCircle, Newspaper, CalendarDays } from 'lucide-react';
 import { getTotalUsersCount } from '@/lib/user-service';
 import { getTotalPostsCount } from '@/lib/post-service';
 import { createAdminBroadcast } from '@/lib/notification-service';
 import { Separator } from '@/components/ui/separator';
+import { getTotalArticlesCount } from '@/lib/article-service';
+import { getTotalEventsCount } from '@/lib/event-service';
 
 
 export default function AdminDashboardPage() {
@@ -24,7 +26,8 @@ export default function AdminDashboardPage() {
 
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
-  // Placeholder stats
+  const [totalArticles, setTotalArticles] = useState<number | null>(null);
+  const [totalEvents, setTotalEvents] = useState<number | null>(null);
   const [totalEngagement, setTotalEngagement] = useState<number | null>(null); 
   const [activeUsersToday, setActiveUsersToday] = useState<number | null>(null);
 
@@ -57,8 +60,14 @@ export default function AdminDashboardPage() {
         try {
           const usersCount = await getTotalUsersCount();
           const postsCount = await getTotalPostsCount();
+          const articlesCount = await getTotalArticlesCount();
+          const eventsCount = await getTotalEventsCount();
+
           setTotalUsers(usersCount);
           setTotalPosts(postsCount);
+          setTotalArticles(articlesCount);
+          setTotalEvents(eventsCount);
+
           // Mock data for new stats - replace with actual service calls later
           setTotalEngagement(12345); // Placeholder
           setActiveUsersToday(150); // Placeholder
@@ -148,7 +157,7 @@ export default function AdminDashboardPage() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -165,6 +174,24 @@ export default function AdminDashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-2xl font-bold">{totalPosts ?? 'N/A'}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Articles</CardTitle>
+                  <Newspaper className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{totalArticles ?? 'N/A'}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Events</CardTitle>
+                  <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{totalEvents ?? 'N/A'}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -196,7 +223,7 @@ export default function AdminDashboardPage() {
        <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><LineChart className="mr-2 h-5 w-5" /> Analytics Overview</CardTitle>
-          <CardDescription>Visual trends of key metrics. (Placeholders)</CardDescription>
+          <CardDescription>Visual trends of key metrics. (Placeholders for graphs and detailed reports)</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
@@ -209,8 +236,11 @@ export default function AdminDashboardPage() {
             </Card>
             <Card className="md:col-span-2">
                 <CardHeader><CardTitle className="text-base">Top Performing Content</CardTitle></CardHeader>
-                <CardContent className="h-32 flex items-center justify-center text-muted-foreground">Content List Placeholder</CardContent>
+                <CardContent className="h-32 flex items-center justify-center text-muted-foreground">List of Top Content Placeholder</CardContent>
             </Card>
+             <div className="md:col-span-2 text-right">
+                <Button variant="outline" disabled>View Detailed Analytics (Coming Soon)</Button>
+            </div>
         </CardContent>
       </Card>
 
@@ -218,13 +248,17 @@ export default function AdminDashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><FileText className="mr-2 h-5 w-5" /> Content Management</CardTitle>
+           <CardDescription>Oversee and manage platform content like posts and articles.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Card>
-            <CardHeader><CardTitle className="text-base">Recent Posts Activity</CardTitle></CardHeader>
-            <CardContent className="h-32 flex items-center justify-center text-muted-foreground">Recent Posts List Placeholder</CardContent>
+            <CardHeader><CardTitle className="text-base">Recent Posts & Articles Activity</CardTitle></CardHeader>
+            <CardContent className="h-32 flex items-center justify-center text-muted-foreground">Recent Content List Placeholder</CardContent>
           </Card>
-          <Button variant="outline" disabled>Moderate Content (Coming Soon)</Button>
+          <div className="flex space-x-2">
+             <Button variant="outline" disabled>Moderate Content (Coming Soon)</Button>
+             <Button variant="outline" disabled>View Scheduled Posts (Coming Soon)</Button>
+          </div>
           <p className="text-sm text-muted-foreground">Reported Issues: 0 (Placeholder)</p>
         </CardContent>
       </Card>
@@ -233,13 +267,20 @@ export default function AdminDashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><Users className="mr-2 h-5 w-5" /> User Management</CardTitle>
+           <CardDescription>Manage user accounts, view profiles, and handle user-related issues.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
            <Card>
             <CardHeader><CardTitle className="text-base">User Overview</CardTitle></CardHeader>
-            <CardContent className="h-32 flex items-center justify-center text-muted-foreground">User List / Search Placeholder</CardContent>
+            <CardContent className="space-y-2">
+                <Input placeholder="Search users by name or email (Coming Soon)" disabled />
+                <div className="h-32 flex items-center justify-center text-muted-foreground">User List Table Placeholder</div>
+            </CardContent>
           </Card>
-          <Button variant="outline" disabled>Manage All Users (Coming Soon)</Button>
+          <div className="flex space-x-2">
+            <Button variant="outline" disabled>View All Users (Coming Soon)</Button>
+            <Button variant="outline" disabled>Manage User Roles (Coming Soon)</Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -247,6 +288,7 @@ export default function AdminDashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><Bell className="mr-2 h-5 w-5" /> Broadcast Notification</CardTitle>
+          <CardDescription>Send important announcements to all users on the platform.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleBroadcastNotification} className="space-y-4 max-w-md">
@@ -274,7 +316,7 @@ export default function AdminDashboardPage() {
       <Card>
         <CardHeader>
             <CardTitle className="text-xl flex items-center"><ListChecks className="mr-2 h-5 w-5"/> Activity Log</CardTitle>
-            <CardDescription>Recent administrative actions. (Placeholder)</CardDescription>
+            <CardDescription>Track recent administrative actions and important system events. (Placeholder)</CardDescription>
         </CardHeader>
         <CardContent className="h-40 flex items-center justify-center text-muted-foreground">
             Activity Log Entries Placeholder
@@ -285,6 +327,7 @@ export default function AdminDashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><SettingsIcon className="mr-2 h-5 w-5" /> Admin Settings</CardTitle>
+          <CardDescription>Configure admin-specific settings and general site parameters.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <form onSubmit={handleSaveSecretCode} className="space-y-4 max-w-sm">
@@ -300,7 +343,7 @@ export default function AdminDashboardPage() {
                 className="mt-1"
               />
             </div>
-            <Button type="submit" disabled={isSavingSecret}>
+            <Button type="submit" disabled={isSavingSecret || !newSecretCode.trim()}>
               {isSavingSecret && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save New Secret Code
             </Button>
@@ -309,6 +352,7 @@ export default function AdminDashboardPage() {
           <div>
              <h4 className="font-medium mb-2">Site Configuration</h4>
              <Button variant="outline" disabled>General Site Settings (Coming Soon)</Button>
+             <p className="text-xs text-muted-foreground mt-1"> (e.g., Site name, maintenance mode - Placeholder)</p>
           </div>
         </CardContent>
       </Card>
@@ -321,4 +365,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
