@@ -2,7 +2,7 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ClipboardList, Lightbulb, MessageCircleQuestion, Presentation } from "lucide-react";
+import { ClipboardList, Lightbulb, MessageCircleQuestion, Presentation, FileText, Users, HelpCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -55,10 +55,22 @@ export default function InterviewPrepPage() {
           
           <section>
             <h2 className="text-xl font-semibold mb-3">Additional Resources</h2>
-            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                <li>How to answer "Tell me about yourself?" (Article coming soon)</li>
-                <li>STAR method for behavioral questions (Explanation coming soon)</li>
-                <li>Questions to ask the interviewer (List coming soon)</li>
+            <ul className="list-disc list-inside space-y-2 text-sm">
+                <li>
+                  <Link href="/jobs/interview-prep/tell-me-about-yourself" className="text-primary hover:underline">
+                    How to answer "Tell me about yourself?"
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/jobs/interview-prep/star-method" className="text-primary hover:underline">
+                    STAR method for behavioral questions
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/jobs/interview-prep/questions-to-ask" className="text-primary hover:underline">
+                    Questions to ask the interviewer
+                  </Link>
+                </li>
             </ul>
           </section>
 
