@@ -9,10 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users, FileText, BarChart2, Bell, Settings as SettingsIcon, LogOut, Eye, Trash2, LineChart, ListChecks, ThumbsUp, MessageCircle } from 'lucide-react';
 import { getTotalUsersCount } from '@/lib/user-service';
 import { getTotalPostsCount } from '@/lib/post-service';
 import { createAdminBroadcast } from '@/lib/notification-service';
+import { Separator } from '@/components/ui/separator';
 
 
 export default function AdminDashboardPage() {
@@ -23,6 +24,10 @@ export default function AdminDashboardPage() {
 
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [totalPosts, setTotalPosts] = useState<number | null>(null);
+  // Placeholder stats
+  const [totalEngagement, setTotalEngagement] = useState<number | null>(null); 
+  const [activeUsersToday, setActiveUsersToday] = useState<number | null>(null);
+
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   const [newSecretCode, setNewSecretCode] = useState('');
@@ -54,6 +59,9 @@ export default function AdminDashboardPage() {
           const postsCount = await getTotalPostsCount();
           setTotalUsers(usersCount);
           setTotalPosts(postsCount);
+          // Mock data for new stats - replace with actual service calls later
+          setTotalEngagement(12345); // Placeholder
+          setActiveUsersToday(150); // Placeholder
         } catch (error) {
           console.error("Failed to fetch admin stats:", error);
           toast({ title: "Error fetching stats", description: "Could not load site statistics.", variant: "destructive" });
@@ -121,108 +129,196 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 space-y-8">
       <Card>
         <CardHeader>
           <CardTitle className="text-3xl">Admin Dashboard</CardTitle>
-          <CardDescription>Welcome to the ProLink Admin Panel.</CardDescription>
+          <CardDescription>Welcome to the ProLink Admin Panel. Manage users, content, and site settings.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          
-          <section>
-            <h3 className="text-xl font-semibold mb-2">Site Statistics</h3>
-            {isLoadingStats ? (
-              <div className="flex justify-center items-center py-4">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Total Users</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold">{totalUsers ?? 'N/A'}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Total Posts</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold">{totalPosts ?? 'N/A'}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Reported Issues</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold">0</p> 
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </section>
+      </Card>
 
-           <section>
-            <h3 className="text-xl font-semibold mb-3">Broadcast Notification</h3>
-            <form onSubmit={handleBroadcastNotification} className="space-y-4 max-w-md">
-              <div>
-                <Label htmlFor="broadcastMessage">Message for All Users</Label>
-                <Textarea
-                  id="broadcastMessage"
-                  value={broadcastMessage}
-                  onChange={(e) => setBroadcastMessage(e.target.value)}
-                  placeholder="Enter notification message..."
-                  disabled={isBroadcasting}
-                  rows={3}
-                  className="mt-1"
-                />
-              </div>
-              <Button type="submit" disabled={isBroadcasting || !broadcastMessage.trim()}>
-                {isBroadcasting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Send Broadcast
-              </Button>
-            </form>
-          </section>
-
-          <section>
-            <h3 className="text-xl font-semibold mb-2">Management Tools</h3>
-            <div className="space-x-2">
-              <Button variant="outline" disabled>Manage Users</Button>
-              <Button variant="outline" disabled>Content Moderation</Button>
-              <Button variant="outline" disabled>Site Settings</Button>
+      {/* Dashboard Overview (Site Statistics) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center"><BarChart2 className="mr-2 h-5 w-5" /> Site Statistics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingStats ? (
+            <div className="flex justify-center items-center py-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          </section>
-
-          <section>
-            <h3 className="text-xl font-semibold mb-3">Admin Settings</h3>
-            <form onSubmit={handleSaveSecretCode} className="space-y-4 max-w-sm">
-              <div>
-                <Label htmlFor="newSecretCode">Change Admin Secret Code</Label>
-                <Input
-                  id="newSecretCode"
-                  type="password"
-                  value={newSecretCode}
-                  onChange={(e) => setNewSecretCode(e.target.value)}
-                  placeholder="Enter new secret code"
-                  disabled={isSavingSecret}
-                  className="mt-1"
-                />
-              </div>
-              <Button type="submit" disabled={isSavingSecret}>
-                {isSavingSecret && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save New Secret Code
-              </Button>
-            </form>
-          </section>
-
-          <Button variant="destructive" onClick={handleAdminLogout}>
-            Exit Admin Panel
-          </Button>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{totalUsers ?? 'N/A'}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Posts</CardTitle>
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{totalPosts ?? 'N/A'}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Engagement</CardTitle>
+                  <ThumbsUp className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{totalEngagement ?? 'N/A'}</p>
+                  <p className="text-xs text-muted-foreground">(Likes & Comments - Placeholder)</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Active Users Today</CardTitle>
+                   <Eye className="h-5 w-5 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{activeUsersToday ?? 'N/A'}</p>
+                  <p className="text-xs text-muted-foreground">(Placeholder)</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Analytics Overview */}
+       <Card>
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center"><LineChart className="mr-2 h-5 w-5" /> Analytics Overview</CardTitle>
+          <CardDescription>Visual trends of key metrics. (Placeholders)</CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+                <CardHeader><CardTitle className="text-base">User Growth Trend</CardTitle></CardHeader>
+                <CardContent className="h-40 flex items-center justify-center text-muted-foreground">Graph Placeholder</CardContent>
+            </Card>
+            <Card>
+                <CardHeader><CardTitle className="text-base">Post Engagement Trend</CardTitle></CardHeader>
+                <CardContent className="h-40 flex items-center justify-center text-muted-foreground">Graph Placeholder</CardContent>
+            </Card>
+            <Card className="md:col-span-2">
+                <CardHeader><CardTitle className="text-base">Top Performing Content</CardTitle></CardHeader>
+                <CardContent className="h-32 flex items-center justify-center text-muted-foreground">Content List Placeholder</CardContent>
+            </Card>
+        </CardContent>
+      </Card>
+
+      {/* Content Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center"><FileText className="mr-2 h-5 w-5" /> Content Management</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Recent Posts Activity</CardTitle></CardHeader>
+            <CardContent className="h-32 flex items-center justify-center text-muted-foreground">Recent Posts List Placeholder</CardContent>
+          </Card>
+          <Button variant="outline" disabled>Moderate Content (Coming Soon)</Button>
+          <p className="text-sm text-muted-foreground">Reported Issues: 0 (Placeholder)</p>
+        </CardContent>
+      </Card>
+
+      {/* User Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center"><Users className="mr-2 h-5 w-5" /> User Management</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+           <Card>
+            <CardHeader><CardTitle className="text-base">User Overview</CardTitle></CardHeader>
+            <CardContent className="h-32 flex items-center justify-center text-muted-foreground">User List / Search Placeholder</CardContent>
+          </Card>
+          <Button variant="outline" disabled>Manage All Users (Coming Soon)</Button>
+        </CardContent>
+      </Card>
+
+      {/* Messaging - Broadcast */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center"><Bell className="mr-2 h-5 w-5" /> Broadcast Notification</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleBroadcastNotification} className="space-y-4 max-w-md">
+            <div>
+              <Label htmlFor="broadcastMessage">Message for All Users</Label>
+              <Textarea
+                id="broadcastMessage"
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                placeholder="Enter notification message..."
+                disabled={isBroadcasting}
+                rows={3}
+                className="mt-1"
+              />
+            </div>
+            <Button type="submit" disabled={isBroadcasting || !broadcastMessage.trim()}>
+              {isBroadcasting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send Broadcast
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+      
+      {/* Activity Log (Placeholder) */}
+      <Card>
+        <CardHeader>
+            <CardTitle className="text-xl flex items-center"><ListChecks className="mr-2 h-5 w-5"/> Activity Log</CardTitle>
+            <CardDescription>Recent administrative actions. (Placeholder)</CardDescription>
+        </CardHeader>
+        <CardContent className="h-40 flex items-center justify-center text-muted-foreground">
+            Activity Log Entries Placeholder
+        </CardContent>
+      </Card>
+
+      {/* Admin Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center"><SettingsIcon className="mr-2 h-5 w-5" /> Admin Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <form onSubmit={handleSaveSecretCode} className="space-y-4 max-w-sm">
+            <div>
+              <Label htmlFor="newSecretCode">Change Admin Secret Code</Label>
+              <Input
+                id="newSecretCode"
+                type="password"
+                value={newSecretCode}
+                onChange={(e) => setNewSecretCode(e.target.value)}
+                placeholder="Enter new secret code"
+                disabled={isSavingSecret}
+                className="mt-1"
+              />
+            </div>
+            <Button type="submit" disabled={isSavingSecret}>
+              {isSavingSecret && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save New Secret Code
+            </Button>
+          </form>
+          <Separator />
+          <div>
+             <h4 className="font-medium mb-2">Site Configuration</h4>
+             <Button variant="outline" disabled>General Site Settings (Coming Soon)</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="mt-8">
+        <Button variant="destructive" onClick={handleAdminLogout}>
+          <LogOut className="mr-2 h-4 w-4" /> Exit Admin Panel
+        </Button>
+      </div>
     </div>
   );
 }
+
