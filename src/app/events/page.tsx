@@ -1,67 +1,61 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAllEvents as fetchEventsFromService } from "@/lib/event-service"; 
 import type { Event as EventType } from "@/types";
-import { CalendarClock, Loader2, MapPin, Users, Link as LinkIcon } from "lucide-react";
+import { Loader2, PlusCircle } from "lucide-react";
 import { useAuth } from '@/context/auth-context';
-import { format } from 'date-fns';
+import EventSidebar from '@/components/events/event-sidebar';
+import EventDisplayArea from '@/components/events/event-display-area';
+import Link from 'next/link';
 
-function EventCard({ event }: { event: EventType }) {
-  const eventDate = event.dateTime ? new Date(event.dateTime as string) : null;
-  return (
-    <Card className="hover:shadow-lg transition-shadow flex flex-col">
-      <CardHeader className="p-4">
-        {event.coverImageUrl && (
-          <div className="relative h-40 w-full mb-3 rounded-t-md overflow-hidden">
-            <Image src={event.coverImageUrl} alt={`${event.title} cover`} layout="fill" objectFit="cover" data-ai-hint="event cover image"/>
-          </div>
-        )}
-        <Link href={`/events/${event.id}`} className="hover:underline">
-          <CardTitle className="text-lg line-clamp-2">{event.title}</CardTitle>
-        </Link>
-        <CardDescription className="text-sm mt-1">
-          {event.organizerInfo ? (
-            <span>By <Link href={`/profile/${event.organizerInfo.uid}`} className="text-primary hover:underline">{event.organizerInfo.firstName} {event.organizerInfo.lastName}</Link></span>
-          ) : (
-            <span>By Unknown Organizer</span>
-          )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-4 pb-3 flex-grow">
-        {eventDate && (
-          <p className="text-sm text-muted-foreground mb-1 flex items-center">
-            <CalendarClock className="mr-2 h-4 w-4" /> {format(eventDate, "EEE, MMM d, yyyy 'at' h:mm a")}
-          </p>
-        )}
-        <p className="text-sm text-muted-foreground mb-2 flex items-center">
-          <MapPin className="mr-2 h-4 w-4" /> {event.location} {event.isOnline && event.meetingLink && <LinkIcon className="ml-2 h-4 w-4 text-primary"/>}
-        </p>
-        <p className="text-sm line-clamp-3 text-foreground/80">{event.description}</p>
-      </CardContent>
-      <CardFooter className="px-4 pb-4 flex justify-between items-center">
-        <span className="text-xs text-muted-foreground flex items-center">
-            <Users className="mr-1 h-4 w-4"/> {event.attendeesCount || 0} attending
-        </span>
-        <Button size="sm" asChild>
-          <Link href={`/events/${event.id}`}>View Details</Link>
-        </Button>
-      </CardFooter>
-    </Card>
-  );
+export interface ScheduleFilter {
+  id: string;
+  label: string;
+  checked: boolean;
+}
+
+export interface CategoryFilter {
+  id: string;
+  label: string;
+  color: string; // e.g., 'bg-red-500'
+  checked: boolean;
+  count?: number; // Optional: for displaying count next to category
 }
 
 export default function EventsPage() {
   const { currentUser, loadingAuth } = useAuth();
   const router = useRouter();
-  const [events, setEvents] = useState<EventType[]>([]);
+  
+  const [allEvents, setAllEvents] = useState<EventType[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<EventType[]>([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentView, setCurrentView] = useState<'month' | 'week' | 'day'>('week');
+  const [displayedMonth, setDisplayedMonth] = useState<Date>(new Date());
+
+  const initialScheduleFilters: ScheduleFilter[] = [
+    { id: 'daily_standup', label: 'Daily Standup', checked: false },
+    { id: 'weekly_review', label: 'Weekly Review', checked: false },
+    { id: 'team_meeting', label: 'Team Meeting', checked: false },
+    { id: 'lunch_break', label: 'Lunch Break', checked: false },
+    { id: 'client_meeting', label: 'Client Meeting', checked: false },
+    { id: 'other_schedule', label: 'Other', checked: false },
+  ];
+  const [scheduleFilters, setScheduleFilters] = useState<ScheduleFilter[]>(initialScheduleFilters);
+
+  const initialCategoryFilters: CategoryFilter[] = [
+    { id: 'work', label: 'Work', color: 'bg-blue-500', checked: true, count: 0 },
+    { id: 'personal', label: 'Personal', color: 'bg-green-500', checked: true, count: 0 },
+    { id: 'teams', label: 'Teams', color: 'bg-purple-500', checked: true, count: 0 },
+    { id: 'project_alpha', label: 'Project Alpha', color: 'bg-red-500', checked: false, count: 0 },
+    { id: 'learning', label: 'Learning', color: 'bg-yellow-500', checked: false, count: 0 },
+  ];
+  const [categoryFilters, setCategoryFilters] = useState<CategoryFilter[]>(initialCategoryFilters);
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -69,66 +63,120 @@ export default function EventsPage() {
     }
   }, [currentUser, loadingAuth, router]);
 
-  useEffect(() => {
-    async function loadEvents() {
-      if (currentUser) { 
-        setIsLoadingEvents(true);
-        try {
-          const eventsData = await fetchEventsFromService();
-          setEvents(eventsData);
-        } catch (error) {
-          console.error("Error fetching events:", error);
-        } finally {
-          setIsLoadingEvents(false);
-        }
+  const loadEvents = useCallback(async () => {
+    if (currentUser) { 
+      setIsLoadingEvents(true);
+      try {
+        const eventsData = await fetchEventsFromService();
+        setAllEvents(eventsData);
+      } catch (error) {
+        console.error("Error fetching events:", error);
+      } finally {
+        setIsLoadingEvents(false);
       }
     }
+  }, [currentUser]);
+
+  useEffect(() => {
     if (!loadingAuth && currentUser) {
         loadEvents();
     }
-  }, [currentUser, loadingAuth]);
+  }, [currentUser, loadingAuth, loadEvents]);
+  
+  useEffect(() => {
+    // Update category counts
+    const newCategoryFilters = categoryFilters.map(catFilter => {
+      const count = allEvents.filter(event => 
+        event.category?.toLowerCase() === catFilter.id.toLowerCase() || 
+        (catFilter.id === 'work' && (!event.category || event.category.toLowerCase() === 'work')) // Example default
+      ).length;
+      return { ...catFilter, count };
+    });
+    setCategoryFilters(newCategoryFilters);
+
+    // Apply filters
+    const activeScheduleFilterLabels = scheduleFilters.filter(f => f.checked).map(f => f.label.toLowerCase());
+    const activeCategoryFilterIds = categoryFilters.filter(f => f.checked).map(f => f.id.toLowerCase());
+
+    const newFilteredEvents = allEvents.filter(event => {
+      const eventCategory = event.category?.toLowerCase();
+      const eventTitle = event.title?.toLowerCase();
+
+      const categoryMatch = activeCategoryFilterIds.length === 0 || (eventCategory && activeCategoryFilterIds.includes(eventCategory)) || (activeCategoryFilterIds.includes('work') && (!eventCategory || eventCategory === 'work')); // Default "Work" if no specific category
+
+      const scheduleMatch = activeScheduleFilterLabels.length === 0 || activeScheduleFilterLabels.some(sf => eventTitle && eventTitle.includes(sf));
+      
+      return categoryMatch && scheduleMatch;
+    });
+    setFilteredEvents(newFilteredEvents);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allEvents, scheduleFilters, categoryFilters]);
+
+
+  const handleDateChange = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
+      setDisplayedMonth(date); // Sync sidebar calendar click with main display
+    }
+  };
+
+  const handleScheduleFilterChange = (id: string) => {
+    setScheduleFilters(prev => 
+      prev.map(f => f.id === id ? { ...f, checked: !f.checked } : f)
+    );
+  };
+
+  const handleCategoryFilterChange = (id: string) => {
+    setCategoryFilters(prev => 
+      prev.map(f => f.id === id ? { ...f, checked: !f.checked } : f)
+    );
+  };
 
   if (loadingAuth || (!currentUser && !loadingAuth)) {
     return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
+      <div className="flex justify-center items-center min-h-[calc(100vh-8rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
-  if (!currentUser) return null;
+  if (!currentUser && !loadingAuth) return null;
+
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Upcoming Events</h1>
-        <Button asChild>
-          <Link href="/events/create">Create Event</Link>
-        </Button>
-      </div>
-
-      {isLoadingEvents ? (
-        <div className="flex justify-center items-center py-10">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-8rem)] -mx-4 -my-6 md:m-0"> {/* Full height, remove container padding */}
+      <EventSidebar
+        selectedDate={selectedDate}
+        onDateChange={handleDateChange}
+        scheduleFilters={scheduleFilters}
+        onScheduleFilterChange={handleScheduleFilterChange}
+        categoryFilters={categoryFilters}
+        onCategoryFilterChange={handleCategoryFilterChange}
+        displayedMonth={displayedMonth}
+        setDisplayedMonth={setDisplayedMonth}
+      />
+      <main className="flex-1 flex flex-col bg-background p-4 md:p-6 overflow-hidden">
+         <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">Calendar</h1>
+            <Button asChild>
+              <Link href="/events/create"><PlusCircle className="mr-2 h-4 w-4" /> Create Event</Link>
+            </Button>
+          </div>
+        {isLoadingEvents ? (
+          <div className="flex-grow flex justify-center items-center">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
-      ) : events.length === 0 ? (
-        <Card>
-          <CardContent className="p-10 text-center">
-            <p className="text-muted-foreground">No events found. Why not create one?</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
-        </div>
-      )}
-      
-      {!isLoadingEvents && events.length > 0 && (
-        <div className="text-center mt-8">
-          <Button variant="outline" disabled>Load more events</Button>
-        </div>
-      )}
+          </div>
+        ) : (
+          <EventDisplayArea
+            events={filteredEvents}
+            currentView={currentView}
+            setCurrentView={setCurrentView}
+            selectedDate={selectedDate}
+            displayedMonth={displayedMonth}
+            setDisplayedMonth={setDisplayedMonth}
+          />
+        )}
+      </main>
     </div>
   );
 }
