@@ -39,7 +39,7 @@ const navItems = [
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { currentUser, loadingAuth } = useAuth();
+  const { currentUser, loadingAuth, refetchUserProfile } = useAuth();
   const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
@@ -66,20 +66,23 @@ export default function Header() {
         setUnreadNotificationsCount(0);
       }
     }
-    fetchNotificationsCount();
+    if (currentUser) {
+        fetchNotificationsCount();
+    }
+    // Re-fetch on pathname change if desired, e.g., after visiting notifications page
   }, [currentUser, pathname]); 
 
   const handleSignOut = async () => {
     try {
       if (currentUser) {
-        // Attempt to set user inactive before signing out
-        await updateUserProfile(currentUser.uid, { isActive: false });
+        await updateUserProfile(currentUser.uid, { isActive: false, lastLogin: new Date() });
       }
       await signOut(auth);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('isAdmin');
       }
       setIsAdmin(false);
+      setCurrentUser(null); // Update local state in AuthContext
       toast({ title: 'Signed Out', description: 'You have been successfully signed out.' });
       router.push('/login');
     } catch (error: any) {
@@ -87,10 +90,19 @@ export default function Header() {
     }
   };
 
+  // Helper in AuthContext to update currentUser
+  const setCurrentUser = (user: any) => {
+    // This is a simplified stand-in. AuthContext should ideally expose a setUser method.
+    // For now, we'll rely on onAuthStateChanged to eventually clear it.
+    // Or, more directly, modify refetchUserProfile or add a clearUser function to AuthContext.
+    refetchUserProfile(); 
+  };
+
+
   return (
-    <header className="bg-card border-b sticky top-0 z-50">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+    <header className="bg-background sticky top-0 z-50 py-2">
+      <div className="container mx-auto px-4 h-auto md:h-16 flex flex-col md:flex-row items-center justify-between">
+        <div className="flex items-center space-x-2 w-full md:w-auto justify-between md:justify-start mb-2 md:mb-0">
           <Link href="/" aria-label="ProLink Home">
             <ProLinkLogo className="h-8 w-8" />
           </Link>
@@ -105,85 +117,113 @@ export default function Header() {
               />
             </div>
           )}
+           {/* Mobile-only user dropdown trigger - to ensure "Me" is always accessible */}
+           {currentUser && (
+            <div className="md:hidden">
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                         <Button variant="ghost" size="icon" className="h-10 w-10">
+                             <Avatar className="h-7 w-7">
+                                <AvatarImage src={currentUser.profilePictureUrl} alt={`${currentUser.firstName} ${currentUser.lastName}`} data-ai-hint="user avatar small"/>
+                                <AvatarFallback>{currentUser.firstName?.charAt(0)}{currentUser.lastName?.charAt(0)}</AvatarFallback>
+                                {currentUser.isActive && <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 ring-1 ring-card" />}
+                            </Avatar>
+                         </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56" align="end">
+                      <DropdownMenuLabel className="font-normal">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium leading-none">{currentUser.firstName} {currentUser.lastName}</p>
+                          <p className="text-xs leading-none text-muted-foreground">
+                            {currentUser.headline}
+                          </p>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild><Link href={`/profile/${currentUser.uid}`}><UserIcon className="mr-2 h-4 w-4" /><span>View Profile</span></Link></DropdownMenuItem>
+                      <DropdownMenuItem asChild><Link href="/settings"><Settings className="mr-2 h-4 w-4" /><span>Settings & Privacy</span></Link></DropdownMenuItem>
+                      {isAdmin && <DropdownMenuItem asChild><Link href="/admin/dashboard"><ShieldCheck className="mr-2 h-4 w-4" /><span>Admin Dashboard</span></Link></DropdownMenuItem>}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleSignOut}><LogOut className="mr-2 h-4 w-4" /><span>Sign Out</span></DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+           )}
         </div>
 
-        <nav className="flex items-center space-x-1 sm:space-x-2 md:space-x-3 lg:space-x-4">
+        <div className="flex items-center justify-center w-full md:w-auto">
           {loadingAuth ? (
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           ) : currentUser ? (
-            <>
-              {navItems.map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={cn(
-                    "relative flex flex-col items-center p-1 text-xs text-muted-foreground hover:text-foreground transition-colors",
-                    pathname === item.href && "text-foreground border-b-2 border-primary"
-                  )}
-                  aria-label={item.label}
-                >
-                  <item.icon className="h-5 w-5 sm:h-6 sm:w-6" />
-                  {item.href === '/notifications' && unreadNotificationsCount > 0 && (
-                    <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">
-                      {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+            <div className="flex items-center space-x-0 md:space-x-2">
+              <nav className="bg-card rounded-full shadow-md p-1 flex items-center space-x-0.5 sm:space-x-1">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className="group relative flex flex-col items-center justify-center p-1.5 sm:p-2 min-w-[56px] sm:min-w-[64px] h-[56px] sm:h-[60px] rounded-xl transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={item.label}
+                  >
+                    <div className={cn(
+                      "flex items-center justify-center h-8 w-8 sm:h-9 sm:w-9 rounded-full transition-all duration-150 ease-in-out",
+                      pathname === item.href ? "bg-primary scale-105" : "bg-transparent group-hover:bg-accent/20"
+                    )}>
+                      <item.icon className={cn(
+                        "h-4 w-4 sm:h-5 sm:w-5 transition-colors",
+                        pathname === item.href ? "text-primary-foreground" : "text-muted-foreground group-hover:text-accent-foreground"
+                      )} />
+                    </div>
+                    <span className={cn(
+                      "mt-0.5 text-[10px] sm:text-xs transition-colors whitespace-nowrap",
+                      pathname === item.href ? "text-primary font-semibold" : "text-muted-foreground group-hover:text-accent-foreground"
+                    )}>
+                      {item.label}
                     </span>
-                  )}
-                  <span className="hidden sm:block text-xs">{item.label}</span>
-                </Link>
-              ))}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-auto p-1 flex flex-col items-center text-xs text-muted-foreground hover:text-foreground">
-                    <Avatar className="h-6 w-6 sm:h-7 sm:w-7 relative">
-                      <AvatarImage src={currentUser.profilePictureUrl} alt={`${currentUser.firstName} ${currentUser.lastName}`} data-ai-hint="user avatar small"/>
-                      <AvatarFallback>{currentUser.firstName?.charAt(0)}{currentUser.lastName?.charAt(0)}</AvatarFallback>
-                      {/* Current user is always active when logged in */}
-                       <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 ring-1 ring-card" />
-                    </Avatar>
-                    <div className='hidden sm:flex items-center'>
-                      <span className="text-xs">Me</span>
-                      <ChevronDown className="h-3 w-3" />
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{currentUser.firstName} {currentUser.lastName}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {currentUser.headline}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href={`/profile/${currentUser.uid}`}>
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      <span>View Profile</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings & Privacy</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  {isAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin/dashboard">
-                        <ShieldCheck className="mr-2 h-4 w-4" />
-                        <span>Admin Dashboard</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Sign Out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
+                    {item.href === '/notifications' && unreadNotificationsCount > 0 && (
+                      <span className="absolute top-1 right-1 sm:top-1.5 sm:right-1.5 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-destructive text-[9px] sm:text-[10px] text-destructive-foreground ring-1 sm:ring-2 ring-card">
+                        {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </nav>
+
+              <div className="hidden md:flex"> {/* Hide "Me" on mobile here, show avatar-only trigger above */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="ml-1 sm:ml-2 relative h-auto p-1 flex flex-col items-center text-xs text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring min-w-[56px] sm:min-w-[64px] h-[56px] sm:h-[60px] rounded-xl group">
+                       <div className="flex items-center justify-center h-8 w-8 sm:h-9 sm:w-9 rounded-full transition-all duration-150 ease-in-out group-hover:bg-accent/20">
+                        <Avatar className="h-5 w-5 sm:h-6 sm:w-6">
+                          <AvatarImage src={currentUser.profilePictureUrl} alt={`${currentUser.firstName} ${currentUser.lastName}`} data-ai-hint="user avatar small"/>
+                          <AvatarFallback>{currentUser.firstName?.charAt(0)}{currentUser.lastName?.charAt(0)}</AvatarFallback>
+                          {currentUser.isActive && <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 ring-1 ring-card" />}
+                        </Avatar>
+                      </div>
+                      <div className='flex items-center mt-0.5 text-muted-foreground group-hover:text-accent-foreground'>
+                        <span className="text-[10px] sm:text-xs">Me</span>
+                        <ChevronDown className="h-3 w-3 ml-0.5" />
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end">
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{currentUser.firstName} {currentUser.lastName}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {currentUser.headline}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild><Link href={`/profile/${currentUser.uid}`}><UserIcon className="mr-2 h-4 w-4" /><span>View Profile</span></Link></DropdownMenuItem>
+                    <DropdownMenuItem asChild><Link href="/settings"><Settings className="mr-2 h-4 w-4" /><span>Settings & Privacy</span></Link></DropdownMenuItem>
+                    {isAdmin && <DropdownMenuItem asChild><Link href="/admin/dashboard"><ShieldCheck className="mr-2 h-4 w-4" /><span>Admin Dashboard</span></Link></DropdownMenuItem>}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}><LogOut className="mr-2 h-4 w-4" /><span>Sign Out</span></DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           ) : (
             <div className="space-x-2">
               <Button asChild variant="ghost">
@@ -194,7 +234,7 @@ export default function Header() {
               </Button>
             </div>
           )}
-        </nav>
+        </div>
       </div>
     </header>
   );
