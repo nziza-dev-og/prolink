@@ -37,7 +37,7 @@ const suggestionFormSchema = z.object({
   category: z.enum(businessCategories, { required_error: "Please select a category."}),
   description: z.string().min(20, 'Description must be at least 20 characters.').max(1000),
   keywords: z.string().optional().transform(val => val ? val.split(',').map(s => s.trim()).filter(s => s) : []),
-  exampleQuestions: z.string().optional().max(2000, "Example questions are too long."),
+  exampleQuestions: z.string().max(2000, "Example questions are too long.").optional(),
 });
 
 type SuggestionFormValues = z.infer<typeof suggestionFormSchema>;
@@ -194,3 +194,4 @@ export default function SuggestBusinessAssessmentPage() {
     </div>
   );
 }
+
