@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -11,9 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Users, FileText, BarChart2, Bell, Settings as SettingsIcon, LogOut, Eye, Trash2, LineChart, ListChecks, ThumbsUp, MessageCircle, Newspaper, CalendarDays, Edit2, ExternalLink } from 'lucide-react';
+import { Loader2, Users, FileText, BarChart2, Bell, Settings as SettingsIcon, LogOut, Eye, Trash2, LineChart, ListChecks, ThumbsUp, MessageCircle, Newspaper, CalendarDays, Edit2, ExternalLink, ShieldAlert, UserPlus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { getTotalUsersCount, getAllUserProfiles } from '@/lib/user-service';
 import { getPosts, getTotalPostsCount } from '@/lib/post-service';
 import { createAdminBroadcast } from '@/lib/notification-service';
@@ -22,11 +23,22 @@ import { getAllArticles, getTotalArticlesCount } from '@/lib/article-service';
 import { getTotalEventsCount } from '@/lib/event-service';
 import type { Post, Article, UserProfile } from '@/types';
 import { format } from 'date-fns';
+import { useAuth } from '@/context/auth-context';
 
+
+interface MockAdmin {
+  id: string;
+  avatarUrl?: string;
+  name: string;
+  email: string;
+  role: 'Super Admin' | 'Editor' | 'Viewer';
+}
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { currentUser, loadingAuth } = useAuth();
+
   const [isAdminVerified, setIsAdminVerified] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
 
@@ -51,6 +63,31 @@ export default function AdminDashboardPage() {
 
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  
+  const mockAdmins = useMemo<MockAdmin[]>(() => [
+    {
+      id: currentUser?.uid || 'admin1',
+      avatarUrl: currentUser?.profilePictureUrl || `https://picsum.photos/seed/${currentUser?.uid || 'admin1'}/40`,
+      name: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Current Admin',
+      email: currentUser?.email || 'admin@example.com',
+      role: 'Super Admin',
+    },
+    {
+      id: 'admin2',
+      avatarUrl: 'https://picsum.photos/seed/admin2/40',
+      name: 'Jane Doe',
+      email: 'jane.doe@example.com',
+      role: 'Editor',
+    },
+    {
+      id: 'admin3',
+      avatarUrl: 'https://picsum.photos/seed/admin3/40',
+      name: 'John Smith',
+      email: 'john.smith@example.com',
+      role: 'Viewer',
+    }
+  ], [currentUser]);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -61,6 +98,9 @@ export default function AdminDashboardPage() {
         router.push('/admin/login');
       }
     } else {
+      // This case should ideally not be hit if routing is handled correctly
+      // or if this useEffect runs only client-side.
+      // However, as a fallback, redirect if not client-side.
       router.push('/admin/login');
     }
     setIsVerifying(false);
@@ -108,8 +148,10 @@ export default function AdminDashboardPage() {
         }
       }
     }
-    fetchAdminData();
-  }, [isAdminVerified, toast]);
+    if (!loadingAuth && isAdminVerified) { // Ensure currentUser context is resolved
+        fetchAdminData();
+    }
+  }, [isAdminVerified, toast, loadingAuth]);
 
   const handleAdminLogout = () => {
     if (typeof window !== 'undefined') {
@@ -154,7 +196,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  if (isVerifying) {
+  if (isVerifying || loadingAuth) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -163,6 +205,7 @@ export default function AdminDashboardPage() {
   }
 
   if (!isAdminVerified) {
+    // Redirect is handled in useEffect, this is a fallback or for SSR attempts
     return null; 
   }
 
@@ -273,6 +316,56 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Manage Admins Section */}
+      <Card>
+        <CardHeader className="flex flex-row justify-between items-center">
+          <div>
+            <CardTitle className="text-xl flex items-center"><ShieldAlert className="mr-2 h-5 w-5" /> Manage Admins</CardTitle>
+            <CardDescription>Oversee platform administrators and their roles.</CardDescription>
+          </div>
+          <Button disabled><UserPlus className="mr-2 h-4 w-4" /> Add Admin (Coming Soon)</Button>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Profile</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {mockAdmins.map((admin) => (
+                <TableRow key={admin.id}>
+                  <TableCell>
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={admin.avatarUrl} alt={admin.name} data-ai-hint="admin avatar" />
+                        <AvatarFallback>{admin.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{admin.name}</p>
+                        <p className="text-xs text-muted-foreground">{admin.email}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{admin.role}</TableCell>
+                  <TableCell className="text-right space-x-1">
+                    <Button variant="outline" size="icon" className="h-8 w-8" title="Edit Admin (Coming Soon)" disabled>
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button variant="destructive" size="icon" className="h-8 w-8" title="Remove Admin (Coming Soon)" disabled>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+
       {/* Content Management */}
       <Card>
         <CardHeader>
@@ -356,7 +449,7 @@ export default function AdminDashboardPage() {
                                 <TableRow key={user.uid}>
                                     <TableCell>
                                     <Avatar className="h-8 w-8">
-                                        <AvatarImage src={user.profilePictureUrl} alt={user.firstName} data-ai-hint="user avatar small"/>
+                                        <AvatarImage src={user.profilePictureUrl} alt={user.firstName || 'user'} data-ai-hint="user avatar small"/>
                                         <AvatarFallback>{user.firstName?.charAt(0)}{user.lastName?.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     </TableCell>
@@ -469,3 +562,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
