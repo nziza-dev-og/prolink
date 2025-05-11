@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, Briefcase, Lightbulb, CheckCircle, TrendingUp, DollarSign, LineChart, Users as UsersIcon, MessageCircle } from "lucide-react";
+import { ChevronLeft, Briefcase, Lightbulb, CheckCircle, TrendingUp, DollarSign, LineChart, Users as UsersIcon, MessageCircle, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import React from "react";
@@ -92,18 +92,26 @@ export default function BusinessSkillsAssessmentPage() {
     <div className="container mx-auto py-8 max-w-4xl">
       <Card className="shadow-lg">
         <CardHeader className="bg-muted/30 p-6">
-          <Button variant="outline" size="sm" className="mb-4 w-fit bg-background hover:bg-accent/10" asChild>
-            <Link href="/jobs/skill-assessments">
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back to Skill Assessments
-            </Link>
-          </Button>
+          <div className="flex justify-between items-start mb-4">
+            <Button variant="outline" size="sm" className="w-fit bg-background hover:bg-accent/10" asChild>
+              <Link href="/jobs/skill-assessments">
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back to Skill Assessments
+              </Link>
+            </Button>
+            <Button variant="default" size="sm" asChild>
+              <Link href="/jobs/skill-assessments/business/suggest">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Suggest New Assessment
+              </Link>
+            </Button>
+          </div>
           <div className="flex items-center space-x-3">
             <Briefcase className="h-10 w-10 text-primary" />
             <div>
               <CardTitle className="text-3xl font-bold">Business Skill Assessments</CardTitle>
               <CardDescription className="text-md text-muted-foreground">
-                Demonstrate your proficiency in project management, marketing, sales, finance, and other business-related skills.
+                Demonstrate your proficiency in various business skills. Contribute by suggesting new assessments!
               </CardDescription>
             </div>
           </div>
@@ -112,7 +120,7 @@ export default function BusinessSkillsAssessmentPage() {
           <section>
             <h2 className="text-2xl font-semibold mb-3 border-b pb-2">Introduction</h2>
             <p className="text-foreground/80 leading-relaxed">
-              Validate your business acumen and soft skills with our range of business-focused assessments. These tests are designed to help you prove your capabilities in key areas crucial for success in various professional roles. Successful completion can enhance your profile and appeal to employers looking for well-rounded candidates.
+              Validate your business acumen and soft skills with our range of business-focused assessments. These tests are designed to help you prove your capabilities in key areas crucial for success in various professional roles. Successful completion can enhance your profile and appeal to employers looking for well-rounded candidates. You can also contribute by suggesting new assessments to expand our library.
             </p>
           </section>
 
@@ -163,7 +171,7 @@ export default function BusinessSkillsAssessmentPage() {
                 <h2 className="text-xl font-semibold text-center">Expanding Our Business Offerings!</h2>
             </div>
             <p className="text-center text-muted-foreground">
-              We are actively developing more assessments to cover a broad spectrum of business skills, including advanced strategic planning, leadership styles, negotiation tactics, and more. Keep an eye on this space for new opportunities to validate your business expertise.
+              We are actively developing more assessments to cover a broad spectrum of business skills, including advanced strategic planning, leadership styles, negotiation tactics, and more. Feel free to suggest assessments you'd like to see! Keep an eye on this space for new opportunities to validate your business expertise.
             </p>
           </section>
         </CardContent>

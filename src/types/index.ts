@@ -1,4 +1,5 @@
 
+
 import type { Timestamp } from 'firebase/firestore';
 
 export interface UserProfile {
@@ -199,4 +200,19 @@ export interface JobApplication {
   coverLetter: string;
   appliedDate: Timestamp | string;
   status: 'submitted' | 'reviewed' | 'interviewing' | 'rejected' | 'hired' | 'withdrawn';
+}
+
+export interface AssessmentSuggestion {
+    id: string;
+    suggesterId: string;
+    suggesterName: string; 
+    title: string;
+    category: "Project Management" | "Digital Marketing" | "Finance & Accounting" | "Sales & Negotiation" | "Business Communication" | "Data Analysis" | "Leadership & Management" | "Entrepreneurship" | "Human Resources" | "Customer Service" | "Other";
+    description: string;
+    keywords?: string[];
+    exampleQuestions?: string; 
+    status: 'pending_review' | 'approved' | 'rejected' | 'implemented';
+    createdAt: Timestamp | string;
+    reviewedAt?: Timestamp | string;
+    reviewerNotes?: string;
 }
