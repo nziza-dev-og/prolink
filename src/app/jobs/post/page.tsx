@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react'; // Added useEffect import
+import { useState, useEffect } from 'react'; 
 import { useRouter } from 'next/navigation';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,10 +12,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { createJob } from '@/lib/job-service';
 import type { Job } from '@/types';
+import { FormField, FormItem, FormControl, FormLabel, FormMessage } from '@/components/ui/form';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const jobFormSchema = z.object({
   title: z.string().min(3, 'Job title must be at least 3 characters.').max(100),
@@ -25,6 +28,8 @@ const jobFormSchema = z.object({
   description: z.string().min(50, 'Description must be at least 50 characters.').max(5000),
   companyLogoUrl: z.string().url("Must be a valid URL for company logo.").optional().or(z.literal('')),
   skillsRequired: z.string().optional().transform(val => val ? val.split(',').map(s => s.trim()).filter(s => s) : []),
+  assessmentId: z.string().optional().or(z.literal('')),
+  addAssessmentLater: z.boolean().default(false),
 });
 
 type JobFormValues = z.infer<typeof jobFormSchema>;
@@ -45,8 +50,12 @@ export default function PostJobPage() {
       description: '',
       companyLogoUrl: '',
       skillsRequired: [],
+      assessmentId: '',
+      addAssessmentLater: false,
     },
   });
+
+  const addAssessmentLaterValue = form.watch('addAssessmentLater');
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -64,9 +73,9 @@ export default function PostJobPage() {
       const newJobData: Omit<Job, 'id' | 'postedDate'> = {
         ...data,
         authorId: currentUser.uid,
-        // companyLogoUrl can be undefined if not provided, or an empty string which is fine.
-        // Firestore will not save undefined fields.
         companyLogoUrl: data.companyLogoUrl || undefined, 
+        assessmentId: data.addAssessmentLater ? undefined : (data.assessmentId || undefined), // Clear assessmentId if addAssessmentLater is true
+        addAssessmentLater: data.addAssessmentLater,
       };
       const jobId = await createJob(newJobData);
       toast({ title: "Job Posted", description: "Your job listing is now live!" });
@@ -149,9 +158,65 @@ export default function PostJobPage() {
             <div>
               <Label htmlFor="skillsRequired">Skills Required (comma-separated)</Label>
               <Input id="skillsRequired" placeholder="e.g., React, Node.js, SQL" {...form.register('skillsRequired')} disabled={isSubmitting} />
-               {/* The transform in Zod schema handles array conversion, so direct error message for skillsRequired (as string) is fine if needed */}
               {form.formState.errors.skillsRequired && <p className="text-sm text-destructive mt-1">{form.formState.errors.skillsRequired.message}</p>}
             </div>
+
+            <Card className="bg-muted/30">
+              <CardHeader>
+                  <CardTitle className="text-lg">Skill Assessment (Optional)</CardTitle>
+                  <CardDescription>You can link an existing skill assessment or add one later.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="assessmentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assessment ID</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder="Enter assessment ID (e.g., python_fundamentals)" 
+                          disabled={isSubmitting || addAssessmentLaterValue} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="addAssessmentLater"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            if (checked) {
+                              form.setValue('assessmentId', ''); // Clear assessmentId if checkbox is checked
+                            }
+                          }}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        I will add/create an assessment for this job later.
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+                <Alert variant="default" className="bg-background">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle className="text-sm">Note</AlertTitle>
+                  <AlertDescription className="text-xs">
+                    Currently, you need to manually provide an Assessment ID. A feature to select from existing assessments is planned.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+
 
             <div className="flex justify-end space-x-2">
               <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>

@@ -12,10 +12,11 @@ import { Separator } from "@/components/ui/separator";
 import { getJobById, addUserIdToJobSavedBy, removeUserIdFromJobSavedBy } from '@/lib/job-service';
 import { getUserProfile, saveJobToProfile, unsaveJobFromProfile } from '@/lib/user-service'; 
 import type { Job, UserProfile } from "@/types";
-import { Briefcase, CalendarDays, ExternalLink, Loader2, MapPin, User, CheckCircle, Bookmark, BookmarkCheck, BookmarkX } from "lucide-react";
+import { Briefcase, CalendarDays, ExternalLink, Loader2, MapPin, User, CheckCircle, Bookmark, BookmarkCheck, ListChecks, Info } from "lucide-react"; // Added ListChecks, Info
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { checkIfUserApplied } from '@/lib/application-service';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 export default function JobDetailPage() {
@@ -50,7 +51,6 @@ export default function JobDetailPage() {
           setJobPoster(posterData);
         }
         if (currentUser && jobData) {
-          // Ensure currentUser.savedJobs is an array before checking
           setIsJobSaved(Array.isArray(currentUser.savedJobs) && currentUser.savedJobs.includes(jobData.id));
         }
       } catch (error) {
@@ -98,7 +98,6 @@ export default function JobDetailPage() {
         await removeUserIdFromJobSavedBy(job.id, currentUser.uid); 
         toast({ title: "Job Unsaved", description: `${job.title} removed from your saved jobs.` });
         setIsJobSaved(false);
-        // Optimistically update job's savedBy count if displayed (not currently displayed)
         setJob(prevJob => prevJob ? ({ ...prevJob, savedBy: prevJob.savedBy?.filter(uid => uid !== currentUser.uid) }) : null);
 
       } else {
@@ -106,7 +105,6 @@ export default function JobDetailPage() {
         await addUserIdToJobSavedBy(job.id, currentUser.uid); 
         toast({ title: "Job Saved!", description: `${job.title} added to your saved jobs.` });
         setIsJobSaved(true);
-        // Optimistically update job's savedBy count
         setJob(prevJob => prevJob ? ({ ...prevJob, savedBy: [...(prevJob.savedBy || []), currentUser.uid] }) : null);
       }
       await refetchUserProfile(); 
@@ -201,6 +199,34 @@ export default function JobDetailPage() {
               </div>
             </>
           )}
+
+          {(job.assessmentId || job.addAssessmentLater) && (
+             <>
+              <Separator className="my-6" />
+              <h3 className="text-xl font-semibold mb-3">Skill Assessment</h3>
+              {job.assessmentId ? (
+                <Alert>
+                    <ListChecks className="h-4 w-4" />
+                    <AlertTitle>Assessment Linked</AlertTitle>
+                    <AlertDescription>
+                        This job has an associated skill assessment. Assessment ID: <strong>{job.assessmentId}</strong>. 
+                        {/* Future: You might be prompted to take it during application. */}
+                        <Button variant="link" className="p-0 h-auto ml-2" asChild disabled>
+                          <Link href={`/jobs/skill-assessments/view/${job.assessmentId}`}>View Assessment Details (Coming Soon)</Link>
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+              ) : job.addAssessmentLater ? (
+                <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300">
+                    <Info className="h-4 w-4 !text-blue-700 dark:!text-blue-300" />
+                    <AlertTitle>Assessment Information</AlertTitle>
+                    <AlertDescription>
+                        The poster plans to add a skill assessment for this job soon.
+                    </AlertDescription>
+                </Alert>
+              ) : null}
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -212,7 +238,7 @@ export default function JobDetailPage() {
           <CardContent className="flex items-center space-x-4">
             <Link href={`/profile/${jobPoster.uid}`}>
                 <Avatar className="h-16 w-16">
-                <AvatarImage src={jobPoster.profilePictureUrl} alt={jobPoster.firstName || ''} data-ai-hint="user avatar" />
+                <AvatarImage src={jobPoster.profilePictureUrl} alt={jobPoster.firstName || ''} data-ai-hint="user avatar"/>
                 <AvatarFallback>{jobPoster.firstName?.charAt(0)}{jobPoster.lastName?.charAt(0)}</AvatarFallback>
                 </Avatar>
             </Link>

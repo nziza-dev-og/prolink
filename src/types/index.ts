@@ -110,6 +110,8 @@ export interface Job {
   authorId: string; 
   applicationsCount?: number;
   savedBy?: string[]; 
+  assessmentId?: string; // Added assessmentId
+  addAssessmentLater?: boolean; // Added flag for adding assessment later
 }
 
 export interface Message {
