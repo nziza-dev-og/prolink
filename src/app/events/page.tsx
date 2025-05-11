@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { getAllEvents as fetchEventsFromService } from "@/lib/event-service"; 
@@ -21,10 +21,28 @@ export interface ScheduleFilter {
 export interface CategoryFilter {
   id: string;
   label: string;
-  color: string; // e.g., 'bg-red-500'
+  color: string; 
   checked: boolean;
-  count?: number; // Optional: for displaying count next to category
+  count?: number; 
 }
+
+// Base definitions for categories (without dynamic counts or checked state)
+const BASE_CATEGORY_DEFINITIONS: Omit<CategoryFilter, 'count' | 'checked'>[] = [
+  { id: 'work', label: 'Work', color: 'bg-blue-500' },
+  { id: 'personal', label: 'Personal', color: 'bg-green-500' },
+  { id: 'teams', label: 'Teams', color: 'bg-purple-500' },
+  { id: 'project_alpha', label: 'Project Alpha', color: 'bg-red-500' },
+  { id: 'learning', label: 'Learning', color: 'bg-yellow-500' },
+  { id: 'webinar', label: 'Webinar', color: 'bg-teal-500' },
+  { id: 'conference', label: 'Conference', color: 'bg-indigo-500' },
+  { id: 'workshop', label: 'Workshop', color: 'bg-pink-500' },
+  { id: 'meetup', label: 'Meetup / Networking', color: 'bg-orange-500' },
+  { id: 'social', label: 'Social Gathering', color: 'bg-cyan-500' },
+  { id: 'other', label: 'Other', color: 'bg-gray-500' },
+];
+
+const initialCheckedCategoryIds = ['work', 'personal', 'teams', 'webinar', 'conference', 'workshop', 'meetup', 'social', 'other'];
+
 
 export default function EventsPage() {
   const { currentUser, loadingAuth } = useAuth();
@@ -48,14 +66,16 @@ export default function EventsPage() {
   ];
   const [scheduleFilters, setScheduleFilters] = useState<ScheduleFilter[]>(initialScheduleFilters);
 
-  const initialCategoryFilters: CategoryFilter[] = [
-    { id: 'work', label: 'Work', color: 'bg-blue-500', checked: true, count: 0 },
-    { id: 'personal', label: 'Personal', color: 'bg-green-500', checked: true, count: 0 },
-    { id: 'teams', label: 'Teams', color: 'bg-purple-500', checked: true, count: 0 },
-    { id: 'project_alpha', label: 'Project Alpha', color: 'bg-red-500', checked: false, count: 0 },
-    { id: 'learning', label: 'Learning', color: 'bg-yellow-500', checked: false, count: 0 },
-  ];
-  const [categoryFilters, setCategoryFilters] = useState<CategoryFilter[]>(initialCategoryFilters);
+  // State for category filters' checked status (id -> boolean)
+  const [categoryCheckedState, setCategoryCheckedState] = useState<Record<string, boolean>>(
+    () => {
+      const initialState: Record<string, boolean> = {};
+      BASE_CATEGORY_DEFINITIONS.forEach(def => {
+        initialState[def.id] = initialCheckedCategoryIds.includes(def.id);
+      });
+      return initialState;
+    }
+  );
 
   useEffect(() => {
     if (!loadingAuth && !currentUser) {
@@ -83,41 +103,68 @@ export default function EventsPage() {
     }
   }, [currentUser, loadingAuth, loadEvents]);
   
-  useEffect(() => {
-    // Update category counts
-    const newCategoryFilters = categoryFilters.map(catFilter => {
-      const count = allEvents.filter(event => 
-        event.category?.toLowerCase() === catFilter.id.toLowerCase() || 
-        (catFilter.id === 'work' && (!event.category || event.category.toLowerCase() === 'work')) // Example default
-      ).length;
-      return { ...catFilter, count };
+  // Memoized calculation for category counts based on allEvents
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    BASE_CATEGORY_DEFINITIONS.forEach(catDef => {
+      counts[catDef.id.toLowerCase()] = allEvents.filter(event => {
+        const eventCatLower = event.category?.toLowerCase();
+        // Exact match
+        if (eventCatLower === catDef.id.toLowerCase()) return true;
+        // Default to 'work' if event has no category and current catDef is 'work'
+        if (catDef.id === 'work' && !eventCatLower) return true;
+        // Default to 'other' if event has a category not in BASE_CATEGORY_DEFINITIONS and current catDef is 'other'
+        if (catDef.id === 'other' && eventCatLower && !BASE_CATEGORY_DEFINITIONS.some(d => d.id === eventCatLower)) return true;
+        return false;
+      }).length;
     });
-    setCategoryFilters(newCategoryFilters);
+    return counts;
+  }, [allEvents]);
 
-    // Apply filters
+  // Memoized category filters with counts for display in sidebar
+  const categoryFiltersForDisplay: CategoryFilter[] = useMemo(() => {
+    return BASE_CATEGORY_DEFINITIONS.map(def => ({
+      ...def,
+      checked: categoryCheckedState[def.id] ?? false,
+      count: categoryCounts[def.id.toLowerCase()] || 0,
+    }));
+  }, [categoryCheckedState, categoryCounts]);
+
+  // useEffect for filtering events based on current filter states
+  useEffect(() => {
     const activeScheduleFilterLabels = scheduleFilters.filter(f => f.checked).map(f => f.label.toLowerCase());
-    const activeCategoryFilterIds = categoryFilters.filter(f => f.checked).map(f => f.id.toLowerCase());
+    const activeCategoryFilterIds = Object.entries(categoryCheckedState)
+      .filter(([, isChecked]) => isChecked)
+      .map(([id]) => id.toLowerCase());
 
     const newFilteredEvents = allEvents.filter(event => {
-      const eventCategory = event.category?.toLowerCase();
-      const eventTitle = event.title?.toLowerCase();
+      const eventCategoryLower = event.category?.toLowerCase();
+      const eventTitleLower = event.title?.toLowerCase();
 
-      const categoryMatch = activeCategoryFilterIds.length === 0 || (eventCategory && activeCategoryFilterIds.includes(eventCategory)) || (activeCategoryFilterIds.includes('work') && (!eventCategory || eventCategory === 'work')); // Default "Work" if no specific category
-
-      const scheduleMatch = activeScheduleFilterLabels.length === 0 || activeScheduleFilterLabels.some(sf => eventTitle && eventTitle.includes(sf));
+      let categoryMatch = activeCategoryFilterIds.length === 0; // If no category filters active, match all
+      if (!categoryMatch) {
+        if (eventCategoryLower && activeCategoryFilterIds.includes(eventCategoryLower)) {
+            categoryMatch = true;
+        } else if (activeCategoryFilterIds.includes('work') && !eventCategoryLower) { // Default to 'work' if event has no category
+            categoryMatch = true;
+        } else if (activeCategoryFilterIds.includes('other') && eventCategoryLower && !BASE_CATEGORY_DEFINITIONS.some(def => def.id === eventCategoryLower)) { // Default to 'other'
+            categoryMatch = true;
+        }
+      }
+      
+      const scheduleMatch = activeScheduleFilterLabels.length === 0 || 
+        (eventTitleLower && activeScheduleFilterLabels.some(sf => eventTitleLower.includes(sf)));
       
       return categoryMatch && scheduleMatch;
     });
     setFilteredEvents(newFilteredEvents);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allEvents, scheduleFilters, categoryFilters]);
+  }, [allEvents, scheduleFilters, categoryCheckedState]);
 
 
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
       setSelectedDate(date);
-      setDisplayedMonth(date); // Sync sidebar calendar click with main display
+      setDisplayedMonth(date); 
     }
   };
 
@@ -128,9 +175,10 @@ export default function EventsPage() {
   };
 
   const handleCategoryFilterChange = (id: string) => {
-    setCategoryFilters(prev => 
-      prev.map(f => f.id === id ? { ...f, checked: !f.checked } : f)
-    );
+    setCategoryCheckedState(prev => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
   };
 
   if (loadingAuth || (!currentUser && !loadingAuth)) {
@@ -144,13 +192,13 @@ export default function EventsPage() {
 
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-8rem)] -mx-4 -my-6 md:m-0"> {/* Full height, remove container padding */}
+    <div className="flex flex-col md:flex-row h-[calc(100vh-theme(space.16))] md:h-[calc(100vh-theme(space.20))] lg:h-[calc(100vh-theme(space.24))] xl:h-[calc(100vh-8rem)] -mx-4 -my-6 md:m-0"> {/* Adjusted height based on header */}
       <EventSidebar
         selectedDate={selectedDate}
         onDateChange={handleDateChange}
         scheduleFilters={scheduleFilters}
         onScheduleFilterChange={handleScheduleFilterChange}
-        categoryFilters={categoryFilters}
+        categoryFilters={categoryFiltersForDisplay} // Pass derived data
         onCategoryFilterChange={handleCategoryFilterChange}
         displayedMonth={displayedMonth}
         setDisplayedMonth={setDisplayedMonth}
@@ -180,3 +228,4 @@ export default function EventsPage() {
     </div>
   );
 }
+
