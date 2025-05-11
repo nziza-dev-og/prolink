@@ -1,7 +1,8 @@
 
+
 'use client';
 
-import type { UserProfile } from '@/types';
+import type { UserProfile, JobPreferences } from '@/types';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,6 +16,7 @@ import { Label as ShadCnLabel } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Briefcase } from 'lucide-react';
@@ -29,6 +31,11 @@ const profileFormSchema = z.object({
   location: z.string().optional(),
   profilePictureUrl: z.string().url("Must be a valid URL for profile picture.").optional().or(z.literal('')),
   coverPhotoUrl: z.string().url("Must be a valid URL for cover photo.").optional().or(z.literal('')),
+  jobPreferences: z.object({
+    desiredTitles: z.string().optional().transform(val => val ? val.split(',').map(s => s.trim()).filter(s => s.length > 0) : []),
+    preferredLocations: z.string().optional().transform(val => val ? val.split(',').map(s => s.trim()).filter(s => s.length > 0) : []),
+    openToOpportunities: z.enum(['NotOpen', 'Open', 'ActivelyLooking']).optional().default('NotOpen'),
+  }).optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>;
@@ -53,6 +60,11 @@ export default function SettingsPage() {
       location: '',
       profilePictureUrl: '',
       coverPhotoUrl: '',
+      jobPreferences: {
+        desiredTitles: [],
+        preferredLocations: [],
+        openToOpportunities: 'NotOpen',
+      },
     },
   });
 
@@ -74,6 +86,11 @@ export default function SettingsPage() {
         location: currentUser.location || '',
         profilePictureUrl: initialProfilePicUrl,
         coverPhotoUrl: initialCoverPhotoUrl,
+        jobPreferences: {
+          desiredTitles: currentUser.jobPreferences?.desiredTitles?.join(', ') || '',
+          preferredLocations: currentUser.jobPreferences?.preferredLocations?.join(', ') || '',
+          openToOpportunities: currentUser.jobPreferences?.openToOpportunities || 'NotOpen',
+        },
       });
       setImagePreviewUrl(initialProfilePicUrl || null);
       setCoverImagePreviewUrl(initialCoverPhotoUrl || null);
@@ -107,11 +124,28 @@ export default function SettingsPage() {
   const onProfileSubmit = async (values: ProfileFormValues) => {
     if (!currentUser) return;
     setIsSubmittingProfile(true);
+
+    // Transform jobPreferences strings back to arrays for desiredTitles and preferredLocations
+    const jobPreferencesToSave: JobPreferences = {
+        desiredTitles: typeof values.jobPreferences?.desiredTitles === 'string' 
+            ? values.jobPreferences.desiredTitles.split(',').map(s => s.trim()).filter(s => s) 
+            : values.jobPreferences?.desiredTitles || [],
+        preferredLocations: typeof values.jobPreferences?.preferredLocations === 'string'
+            ? values.jobPreferences.preferredLocations.split(',').map(s => s.trim()).filter(s => s)
+            : values.jobPreferences?.preferredLocations || [],
+        openToOpportunities: values.jobPreferences?.openToOpportunities || 'NotOpen',
+    };
+    
     try {
       await updateUserProfile(currentUser.uid, { 
-        ...values,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        headline: values.headline,
+        summary: values.summary,
+        location: values.location,
         profilePictureUrl: values.profilePictureUrl || undefined,
         coverPhotoUrl: values.coverPhotoUrl || undefined,
+        jobPreferences: jobPreferencesToSave,
       });
       await refetchUserProfile();
       toast({ title: 'Profile Updated', description: 'Your profile information has been successfully updated.' });
@@ -271,43 +305,75 @@ export default function SettingsPage() {
                   </FormItem>
                 )}
               />
-              <div className="flex justify-end">
-                <Button type="submit" disabled={isSubmittingProfile}>
-                  {isSubmittingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Changes
-                </Button>
-              </div>
             </CardContent>
           </Card>
+
+          <Card id="job-preferences">
+            <CardHeader>
+              <CardTitle className="flex items-center"><Briefcase className="mr-2 h-5 w-5 text-primary" /> Job Preferences</CardTitle>
+              <CardDescription>Set your preferences for job alerts and recommendations.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="jobPreferences.desiredTitles"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Desired Job Titles (comma-separated)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Software Engineer, Product Manager" {...field} disabled={isSubmittingProfile} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="jobPreferences.preferredLocations"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Preferred Locations (comma-separated)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Remote, New York, San Francisco" {...field} disabled={isSubmittingProfile} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="jobPreferences.openToOpportunities"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Open to Opportunities?</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isSubmittingProfile}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your openness to new opportunities" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="NotOpen">Not Open</SelectItem>
+                          <SelectItem value="Open">Open to Opportunities</SelectItem>
+                          <SelectItem value="ActivelyLooking">Actively Looking</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </CardContent>
+          </Card>
+          
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSubmittingProfile}>
+              {isSubmittingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save All Changes
+            </Button>
+          </div>
         </form>
       </Form>
 
-      <Card id="job-preferences">
-        <CardHeader>
-          <CardTitle className="flex items-center"><Briefcase className="mr-2 h-5 w-5 text-primary" /> Job Preferences</CardTitle>
-          <CardDescription>Set your preferences for job alerts and recommendations.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Job preferences settings are under development. You will be able to specify desired roles, locations, salary expectations, and more.
-          </p>
-          {/* Placeholder for future form elements */}
-           <div className="mt-4 space-y-4">
-                <div>
-                    <ShadCnLabel>Desired Job Titles</ShadCnLabel>
-                    <Input placeholder="e.g., Software Engineer, Product Manager" disabled />
-                </div>
-                <div>
-                    <ShadCnLabel>Preferred Locations</ShadCnLabel>
-                    <Input placeholder="e.g., Remote, New York, San Francisco" disabled />
-                </div>
-                <div>
-                    <ShadCnLabel>Open to Opportunities?</ShadCnLabel>
-                     <p className="text-xs text-muted-foreground"> (Yes / No / Actively Looking - Coming Soon)</p>
-                </div>
-           </div>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>

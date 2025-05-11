@@ -2,6 +2,12 @@
 
 import type { Timestamp } from 'firebase/firestore';
 
+export interface JobPreferences {
+  desiredTitles?: string[];
+  preferredLocations?: string[];
+  openToOpportunities?: 'NotOpen' | 'Open' | 'ActivelyLooking';
+}
+
 export interface UserProfile {
   id: string; 
   uid: string; 
@@ -27,6 +33,7 @@ export interface UserProfile {
   pendingInvitations?: string[]; 
   suggestedConnections?: UserProfile[]; 
   savedJobs?: string[]; 
+  jobPreferences?: JobPreferences;
 }
 
 export interface WorkExperience {

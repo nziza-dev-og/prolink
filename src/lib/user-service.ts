@@ -1,7 +1,7 @@
 
 
 'use server';
-import type { UserProfile } from '@/types';
+import type { UserProfile, JobPreferences } from '@/types';
 import { db } from './firebase';
 import {
   doc,
@@ -25,7 +25,7 @@ import {
   documentId, 
 } from 'firebase/firestore';
 
-export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections' | 'pendingInvitationsCount' | 'pendingInvitations' | 'suggestedConnections' | 'isActive' | 'lastLogin' | 'updatedAt' | 'savedJobs'>): Promise<void> {
+export async function createUserProfile(userId: string, data: Omit<UserProfile, 'id' | 'uid' | 'createdAt' | 'connectionsCount' | 'profilePictureUrl' | 'coverPhotoUrl' | 'connections' | 'pendingInvitationsCount' | 'pendingInvitations' | 'suggestedConnections' | 'isActive' | 'lastLogin' | 'updatedAt' | 'savedJobs' | 'jobPreferences'>): Promise<void> {
   const userRef = doc(db, 'users', userId);
   const defaultProfilePictureUrl = `https://picsum.photos/seed/${userId}/200/200`;
   const defaultCoverPhotoUrl = `https://picsum.photos/seed/${userId}cover/800/200`;
@@ -47,6 +47,11 @@ export async function createUserProfile(userId: string, data: Omit<UserProfile, 
     education: data.education || [],
     skills: data.skills || [],
     savedJobs: [],
+    jobPreferences: { // Initialize job preferences
+        desiredTitles: [],
+        preferredLocations: [],
+        openToOpportunities: 'NotOpen',
+    },
     isActive: true, // Set to true on creation
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -72,6 +77,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       pendingInvitationsCount: data.pendingInvitationsCount || (data.pendingInvitations?.length || 0),
       pendingInvitations: data.pendingInvitations || [],
       savedJobs: data.savedJobs || [],
+      jobPreferences: data.jobPreferences || { desiredTitles: [], preferredLocations: [], openToOpportunities: 'NotOpen' }, // Default if not present
       isActive: data.isActive === undefined ? false : data.isActive, 
     };
 
