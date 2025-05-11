@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -36,8 +35,11 @@ const suggestionFormSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters.').max(150),
   category: z.enum(businessCategories, { required_error: "Please select a category."}),
   description: z.string().min(20, 'Description must be at least 20 characters.').max(1000),
-  keywords: z.string().optional().transform(val => val ? val.split(',').map(s => s.trim()).filter(s => s) : []),
-  exampleQuestions: z.string().max(2000, "Example questions are too long.").optional(),
+  keywords: z.string().default('').transform(val => {
+    if (val.trim() === '') return [];
+    return val.split(',').map(s => s.trim()).filter(s => s);
+  }),
+  exampleQuestions: z.string().max(2000, "Example questions are too long.").default(''),
 });
 
 type SuggestionFormValues = z.infer<typeof suggestionFormSchema>;
@@ -74,7 +76,7 @@ export default function SuggestBusinessAssessmentPage() {
     try {
       await createAssessmentSuggestion({
         suggesterId: currentUser.uid,
-        suggesterName: `${currentUser.firstName} ${currentUser.lastName}`, // Store name for easier display
+        suggesterName: `${currentUser.firstName} ${currentUser.lastName}`, 
         title: data.title,
         category: data.category,
         description: data.description,
@@ -82,7 +84,7 @@ export default function SuggestBusinessAssessmentPage() {
         exampleQuestions: data.exampleQuestions,
       });
       toast({ title: "Suggestion Submitted", description: "Thank you! Your assessment suggestion has been received and will be reviewed." });
-      form.reset(); // Reset form after successful submission
+      form.reset(); 
       router.push('/jobs/skill-assessments/business');
     } catch (error) {
       console.error("Error submitting suggestion:", error);
@@ -158,13 +160,13 @@ export default function SuggestBusinessAssessmentPage() {
             </div>
 
             <div>
-              <Label htmlFor="keywords">Relevant Keywords (comma-separated, optional)</Label>
+              <Label htmlFor="keywords">Relevant Keywords (comma-separated)</Label>
               <Input id="keywords" placeholder="e.g., B2B Sales, Closing Deals, Contract Negotiation" {...form.register('keywords')} disabled={isSubmitting} />
               {form.formState.errors.keywords && <p className="text-sm text-destructive mt-1">{form.formState.errors.keywords.message}</p>}
             </div>
             
             <div>
-              <Label htmlFor="exampleQuestions">Example Questions (optional)</Label>
+              <Label htmlFor="exampleQuestions">Example Questions</Label>
               <Textarea 
                 id="exampleQuestions" 
                 {...form.register('exampleQuestions')} 
@@ -194,4 +196,3 @@ export default function SuggestBusinessAssessmentPage() {
     </div>
   );
 }
-
