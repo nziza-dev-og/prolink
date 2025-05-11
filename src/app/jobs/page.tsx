@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAllJobs as fetchJobsFromService } from "@/lib/job-service"; 
 import type { Job } from "@/types";
-import { Bookmark, Briefcase, CheckCircle, ListFilter, Loader2, MapPin, Search, Settings2, StickyNote, BookmarkCheck, X } from "lucide-react";
+import { Bookmark, Briefcase, CheckCircle, ListFilter, Loader2, MapPin, Search, Settings2, StickyNote, BookmarkCheck, X, Award, ClipboardList } from "lucide-react"; // Added Award, ClipboardList
 import { useAuth } from '@/context/auth-context';
 
 function JobCard({ job, currentUserSavedJobs }: { job: Job, currentUserSavedJobs?: string[] }) {
@@ -165,17 +165,25 @@ export default function JobsPage() {
       <aside className="md:col-span-1 space-y-4 md:sticky top-20 order-1 md:order-none">
         <Card>
           <CardContent className="p-4 space-y-2">
-            <Button variant="ghost" className="w-full justify-start text-md font-normal" disabled>
-              <Bookmark className="mr-3 h-5 w-5 text-muted-foreground" /> My jobs
+            <Button variant="ghost" className="w-full justify-start text-md font-normal" asChild>
+              <Link href="/jobs/my-jobs">
+                <Bookmark className="mr-3 h-5 w-5 text-muted-foreground" /> My jobs
+              </Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-start text-md font-normal" disabled>
-              <StickyNote className="mr-3 h-5 w-5 text-muted-foreground" /> Preferences
+            <Button variant="ghost" className="w-full justify-start text-md font-normal" asChild>
+              <Link href="/settings#job-preferences">
+                <StickyNote className="mr-3 h-5 w-5 text-muted-foreground" /> Preferences
+              </Link>
             </Button>
-            <Button variant="ghost" className="w-full justify-start text-md font-normal" disabled>
-              <CheckCircle className="mr-3 h-5 w-5 text-muted-foreground" /> Skill assessments
+            <Button variant="ghost" className="w-full justify-start text-md font-normal" asChild>
+              <Link href="/jobs/skill-assessments">
+                <Award className="mr-3 h-5 w-5 text-muted-foreground" /> Skill assessments
+              </Link>
             </Button>
-             <Button variant="ghost" className="w-full justify-start text-md font-normal" disabled>
-              <Settings2 className="mr-3 h-5 w-5 text-muted-foreground" /> Interview prep
+             <Button variant="ghost" className="w-full justify-start text-md font-normal" asChild>
+                <Link href="/jobs/interview-prep">
+                  <ClipboardList className="mr-3 h-5 w-5 text-muted-foreground" /> Interview prep
+                </Link>
             </Button>
           </CardContent>
         </Card>
@@ -289,3 +297,4 @@ export default function JobsPage() {
     </div>
   );
 }
+

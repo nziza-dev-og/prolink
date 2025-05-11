@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Briefcase } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -282,6 +282,33 @@ export default function SettingsPage() {
         </form>
       </Form>
 
+      <Card id="job-preferences">
+        <CardHeader>
+          <CardTitle className="flex items-center"><Briefcase className="mr-2 h-5 w-5 text-primary" /> Job Preferences</CardTitle>
+          <CardDescription>Set your preferences for job alerts and recommendations.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Job preferences settings are under development. You will be able to specify desired roles, locations, salary expectations, and more.
+          </p>
+          {/* Placeholder for future form elements */}
+           <div className="mt-4 space-y-4">
+                <div>
+                    <ShadCnLabel>Desired Job Titles</ShadCnLabel>
+                    <Input placeholder="e.g., Software Engineer, Product Manager" disabled />
+                </div>
+                <div>
+                    <ShadCnLabel>Preferred Locations</ShadCnLabel>
+                    <Input placeholder="e.g., Remote, New York, San Francisco" disabled />
+                </div>
+                <div>
+                    <ShadCnLabel>Open to Opportunities?</ShadCnLabel>
+                     <p className="text-xs text-muted-foreground"> (Yes / No / Actively Looking - Coming Soon)</p>
+                </div>
+           </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Account Settings</CardTitle>
@@ -322,3 +349,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
