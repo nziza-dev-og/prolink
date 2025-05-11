@@ -25,7 +25,7 @@ export interface UserProfile {
   pendingInvitationsCount?: number;
   pendingInvitations?: string[]; 
   suggestedConnections?: UserProfile[]; 
-  savedJobs?: string[]; // Added to store saved job IDs
+  savedJobs?: string[]; 
 }
 
 export interface WorkExperience {
@@ -101,7 +101,7 @@ export interface Job {
   skillsRequired?: string[];
   authorId: string; 
   applicationsCount?: number;
-  savedBy?: string[]; // Added to track who saved the job
+  savedBy?: string[]; 
 }
 
 export interface Message {
@@ -125,7 +125,7 @@ export interface LearningCourse {
 
 export interface Notification {
   id: string;
-  type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment" | "connection_accepted" | "admin_broadcast";
+  type: "connection_request" | "message" | "job_alert" | "profile_view" | "post_like" | "post_comment" | "connection_accepted" | "admin_broadcast" | "job_application_received";
   recipientId?: string; 
   actorId?: string;     
   user?: {              

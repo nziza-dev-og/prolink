@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -39,34 +39,34 @@ export default function JobDetailPage() {
     }
   }, [currentUser, loadingAuth, router]);
   
-  useEffect(() => {
-    async function fetchJobData() {
-      if (jobId) {
-        setIsLoadingData(true);
-        try {
-          const jobData = await getJobById(jobId);
-          setJob(jobData);
-          if (jobData?.authorId) {
-            const posterData = await getUserProfile(jobData.authorId);
-            setJobPoster(posterData);
-          }
-          if (currentUser && jobData) {
-            setIsJobSaved(currentUser.savedJobs?.includes(jobData.id) || false);
-          }
-        } catch (error) {
-          console.error("Failed to fetch job data:", error);
-          toast({ title: "Error", description: "Could not load job details.", variant: "destructive" });
-        } finally {
-          setIsLoadingData(false);
+  const fetchJobDetails = useCallback(async () => {
+    if (jobId) {
+      setIsLoadingData(true);
+      try {
+        const jobData = await getJobById(jobId);
+        setJob(jobData);
+        if (jobData?.authorId) {
+          const posterData = await getUserProfile(jobData.authorId);
+          setJobPoster(posterData);
         }
+        if (currentUser && jobData) {
+          // Ensure currentUser.savedJobs is an array before checking
+          setIsJobSaved(Array.isArray(currentUser.savedJobs) && currentUser.savedJobs.includes(jobData.id));
+        }
+      } catch (error) {
+        console.error("Failed to fetch job data:", error);
+        toast({ title: "Error", description: "Could not load job details.", variant: "destructive" });
+      } finally {
+        setIsLoadingData(false);
       }
     }
-    if (!loadingAuth && currentUser) { // currentUser check ensures savedJobs check can happen
-        fetchJobData();
-    } else if (!loadingAuth && !currentUser) { // If not logged in, still fetch basic job data
-        fetchJobData();
+  }, [jobId, currentUser, toast]);
+
+  useEffect(() => {
+    if (!loadingAuth) {
+      fetchJobDetails();
     }
-  }, [jobId, loadingAuth, currentUser, toast]);
+  }, [loadingAuth, fetchJobDetails]);
 
   useEffect(() => {
     if (currentUser && jobId && !loadingAuth) {
@@ -80,6 +80,12 @@ export default function JobDetailPage() {
     }
   }, [currentUser, jobId, loadingAuth]);
 
+  useEffect(() => {
+    if (currentUser && job) {
+        setIsJobSaved(Array.isArray(currentUser.savedJobs) && currentUser.savedJobs.includes(job.id));
+    }
+  }, [currentUser, job, currentUser?.savedJobs]);
+
   const handleSaveToggle = async () => {
     if (!currentUser || !job) {
       toast({ title: "Action Failed", description: "Please login to save jobs.", variant: "destructive"});
@@ -89,16 +95,21 @@ export default function JobDetailPage() {
     try {
       if (isJobSaved) {
         await unsaveJobFromProfile(currentUser.uid, job.id);
-        await removeUserIdFromJobSavedBy(job.id, currentUser.uid); // Also update job document
+        await removeUserIdFromJobSavedBy(job.id, currentUser.uid); 
         toast({ title: "Job Unsaved", description: `${job.title} removed from your saved jobs.` });
         setIsJobSaved(false);
+        // Optimistically update job's savedBy count if displayed (not currently displayed)
+        setJob(prevJob => prevJob ? ({ ...prevJob, savedBy: prevJob.savedBy?.filter(uid => uid !== currentUser.uid) }) : null);
+
       } else {
         await saveJobToProfile(currentUser.uid, job.id);
-        await addUserIdToJobSavedBy(job.id, currentUser.uid); // Also update job document
+        await addUserIdToJobSavedBy(job.id, currentUser.uid); 
         toast({ title: "Job Saved!", description: `${job.title} added to your saved jobs.` });
         setIsJobSaved(true);
+        // Optimistically update job's savedBy count
+        setJob(prevJob => prevJob ? ({ ...prevJob, savedBy: [...(prevJob.savedBy || []), currentUser.uid] }) : null);
       }
-      await refetchUserProfile(); // Update auth context with new savedJobs list
+      await refetchUserProfile(); 
     } catch (error) {
       console.error("Error toggling save job:", error);
       toast({ title: "Error", description: "Could not update save status.", variant: "destructive" });

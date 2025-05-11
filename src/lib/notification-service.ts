@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from './firebase';
@@ -43,7 +44,7 @@ export async function getAllUserNotifications(userId: string): Promise<Notificat
         content: data.content,
         timestamp: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt as string),
         isRead: false, 
-        link: data.link || undefined, // Admin broadcasts might have links
+        link: data.link || undefined, 
       } as Notification);
     });
   } catch (error) {
@@ -57,7 +58,7 @@ export async function getAllUserNotifications(userId: string): Promise<Notificat
       userNotificationsCollectionRef, 
       where('recipientId', '==', userId), 
       orderBy('timestamp', 'desc'), 
-      limit(50) // Limit to a reasonable number of recent notifications
+      limit(50) 
     );
     const userNotificationsSnapshot = await getDocs(userNotificationsQuery);
 
@@ -74,12 +75,10 @@ export async function getAllUserNotifications(userId: string): Promise<Notificat
             avatarUrl: actorProfile.profilePictureUrl,
           };
         } else {
-          // Fallback if actor profile is not found (e.g., deleted user)
            actorInfo = { id: data.actorId, name: "A user" };
         }
       }
       
-      // Construct link based on type and entityId - this part might need more robust logic
       let notificationLink = data.link;
       if (!notificationLink) {
         switch(data.type) {
@@ -100,6 +99,10 @@ export async function getAllUserNotifications(userId: string): Promise<Notificat
             case 'job_alert':
                  notificationLink = data.entityId ? `/jobs/${data.entityId}` : '/jobs';
                  break;
+            case 'job_application_received':
+                  notificationLink = data.entityId ? `/jobs/${data.entityId}` : '/jobs'; // Link to the job listing
+                  // Potentially, if you have a page for job applications: `/jobs/${data.entityId}/applications`
+                  break;
             default:
                 notificationLink = '#';
         }
@@ -124,14 +127,11 @@ export async function getAllUserNotifications(userId: string): Promise<Notificat
     console.error("Error fetching user-specific notifications:", error);
   }
 
-  // 3. Sort all notifications by timestamp, newest first
   allNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   return allNotifications;
 }
 
-// Example function to create a user-specific notification (would be called by other services)
-// This is for demonstration of how notifications might be created.
 export async function createUserSpecificNotification(
   notificationData: Omit<Notification, 'id' | 'timestamp' | 'isRead' | 'user'| 'link'> & { timestamp?: any }
 ): Promise<string> {
@@ -139,13 +139,11 @@ export async function createUserSpecificNotification(
   
   const dataToSave: any = {
     ...notificationData,
-    timestamp: notificationData.timestamp || serverTimestamp(), // Use provided or server timestamp
+    timestamp: notificationData.timestamp || serverTimestamp(), 
     isRead: false,
   };
 
-  // Automatically generate content and link if not provided, based on type
   if (!dataToSave.content) {
-     // Basic content generation - real app would need more sophisticated logic / localization
     let content = "You have a new notification.";
     let actorName = "Someone";
     if (dataToSave.actorId) {
@@ -158,18 +156,23 @@ export async function createUserSpecificNotification(
         case 'connection_request': content = `${actorName} sent you a connection request.`; break;
         case 'connection_accepted': content = `${actorName} accepted your connection request.`; break;
         case 'message': content = `${actorName} sent you a new message.`; break;
+        case 'job_application_received': 
+          // Content will be provided by the caller (application-service)
+          break; 
         // ... other types
     }
-    dataToSave.content = content;
+    if(dataToSave.type !== 'job_application_received' || !notificationData.content){ // Avoid overwriting provided content
+        dataToSave.content = content;
+    }
   }
 
   if(!dataToSave.link) {
-     // Basic link generation
       let link = '#';
       switch(dataToSave.type) {
             case 'post_like': case 'post_comment': link = dataToSave.entityId ? `/posts/${dataToSave.entityId}` : '#'; break;
             case 'connection_request': case 'connection_accepted': link = dataToSave.actorId ? `/profile/${dataToSave.actorId}` : '/network'; break;
             case 'message': link = dataToSave.actorId ? `/messaging?chatWith=${dataToSave.actorId}` : '/messaging'; break;
+            case 'job_application_received': link = dataToSave.entityId ? `/jobs/${dataToSave.entityId}` : '/jobs'; break;
             // ... other types
       }
       dataToSave.link = link;

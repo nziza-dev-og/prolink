@@ -15,9 +15,11 @@ import {
   getDoc,
   orderBy, 
   updateDoc,
-  increment, // Added increment
+  increment,
 } from 'firebase/firestore';
-import type { JobApplication } from '@/types';
+import type { Job, JobApplication } from '@/types';
+import { createUserSpecificNotification } from './notification-service'; // Import notification service
+import { getJobById } from './job-service'; // Import job service to get job author
 
 export async function createApplication(
   applicationData: Omit<JobApplication, 'id' | 'appliedDate' | 'status'>
@@ -33,10 +35,33 @@ export async function createApplication(
   // Increment applicationsCount on the job
   const jobRef = doc(db, 'jobs', applicationData.jobId);
   const jobSnap = await getDoc(jobRef);
+  let jobAuthorId: string | null = null;
+  let jobTitle: string | null = null;
+
   if (jobSnap.exists()) {
+      const jobData = jobSnap.data() as Job;
+      jobAuthorId = jobData.authorId;
+      jobTitle = jobData.title;
       await updateDoc(jobRef, {
         applicationsCount: increment(1)
       });
+  }
+
+  // Send notification to job poster
+  if (jobAuthorId && jobTitle && applicationData.applicantId !== jobAuthorId) { // Don't notify if poster applies to own job
+    try {
+      await createUserSpecificNotification({
+        recipientId: jobAuthorId,
+        actorId: applicationData.applicantId,
+        type: 'job_application_received',
+        entityId: applicationData.jobId, // Link to the job
+        entityType: 'job',
+        content: `${applicationData.applicantName} applied for your job: "${jobTitle}".`,
+      });
+    } catch (notificationError) {
+      console.error("Failed to send job application notification:", notificationError);
+      // Optionally, handle this error, e.g., by logging or sending a monitoring alert
+    }
   }
 
 

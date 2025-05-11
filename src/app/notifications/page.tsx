@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -7,9 +8,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getAllUserNotifications, createUserSpecificNotification } from "@/lib/notification-service"; // Added createUserSpecificNotification for potential testing
+import { getAllUserNotifications, createUserSpecificNotification } from "@/lib/notification-service"; 
 import type { Notification } from "@/types"; 
-import { BellRing, Briefcase, Loader2, MessageSquare, Settings, UserCheck, Users, Megaphone } from "lucide-react";
+import { BellRing, Briefcase, Loader2, MessageSquare, Settings, UserCheck, Users, Megaphone, FileText } from "lucide-react"; // Added FileText for job application
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,15 +31,17 @@ function NotificationIcon({ type }: { type: Notification["type"] }) {
       return <BellRing className="h-5 w-5 text-yellow-500" />;
     case "admin_broadcast":
       return <Megaphone className="h-5 w-5 text-destructive" />;
+    case "job_application_received":
+      return <FileText className="h-5 w-5 text-indigo-500" />; // New icon for job applications
     default:
       return <BellRing className="h-5 w-5 text-muted-foreground" />;
   }
 }
 
 function NotificationItem({ notification }: { notification: Notification }) {
-  // Use notification.user (which represents actorInfo) if available
   const actor = notification.user; 
   const avatarHint = notification.type === 'admin_broadcast' || !actor ? "system icon" : "user avatar small";
+  const fallbackName = actor?.name || (notification.type === 'admin_broadcast' ? 'A' : 'U');
   
   return (
     <Link href={notification.link || '#'} className={`block p-4 hover:bg-accent/50 ${!notification.isRead ? 'bg-primary/5' : ''}`}>
@@ -46,7 +49,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
         {actor?.avatarUrl ? (
           <Avatar className="h-10 w-10">
             <AvatarImage src={actor.avatarUrl} alt={actor.name} data-ai-hint={avatarHint}/>
-            <AvatarFallback>{actor.name.charAt(0)}</AvatarFallback>
+            <AvatarFallback>{fallbackName.charAt(0)}</AvatarFallback>
           </Avatar>
         ) : (
           <div className="h-10 w-10 flex items-center justify-center rounded-full bg-muted">
@@ -98,29 +101,6 @@ export default function NotificationsPage() {
     }
   }, [currentUser, loadingAuth, toast]);
 
-  // Example: Function to test creating a notification (for development)
-  // const handleTestCreateNotification = async () => {
-  //   if (!currentUser) return;
-  //   try {
-  //     await createUserSpecificNotification({
-  //       recipientId: currentUser.uid,
-  //       actorId: 'mockUser2', // ID of a user who performed an action
-  //       type: 'post_like',
-  //       entityId: 'somePostId123',
-  //       entityType: 'post',
-  //       content: 'Test User liked your post about Next.js!', // This would ideally be generated more dynamically
-  //       // link will be auto-generated if basic logic exists, or explicitly set
-  //     });
-  //     toast({ title: "Test Notification Created", description: "Check your list."});
-  //     // Re-fetch notifications
-  //     const userNotifications = await getAllUserNotifications(currentUser.uid);
-  //     setNotifications(userNotifications);
-  //   } catch (e) {
-  //     toast({ title: "Error", description: "Could not create test notification.", variant: "destructive" });
-  //   }
-  // };
-
-
   if (loadingAuth || (!currentUser && !loadingAuth)) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-12rem)]">
@@ -135,7 +115,6 @@ export default function NotificationsPage() {
       <Card>
         <CardHeader className="flex flex-row justify-between items-center">
           <CardTitle className="text-xl">Notifications</CardTitle>
-          {/* <Button onClick={handleTestCreateNotification} size="sm">Test Create</Button> */}
           <Button variant="ghost" size="sm" disabled>
             <Settings className="mr-2 h-4 w-4" /> View settings
           </Button>
